@@ -1,0 +1,20 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies (none for this project, just in case)
+node_modules/
+
+# PocketBase runtime (binary + data)
+pb/pocketbase
+pb/pocketbase.zip
+pb/pb_data/
+
+# Temp / extracted files
+js/_full_js_temp.txt

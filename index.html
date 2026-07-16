@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>每日打卡</title>
+<link rel="stylesheet" href="css/app.css">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body data-theme="light">
+
+<div class="blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div></div>
+
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-left">
+      <button class="back-btn" id="backBtn" aria-label="返回主页"><i class="ri-arrow-left-s-fill"></i></button>
+      <div class="header-text">
+        <h1 id="headerTitle">主页</h1>
+        <div class="date" id="headerDate"></div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="avatar-btn" id="avatarBtn" aria-label="用户">👤</button>
+      <button class="theme-btn" id="themeBtn" aria-label="切换主题"><i class="ri-moon-fill"></i></button>
+    </div>
+  </header>
+
+  <!-- ================================================================ -->
+  <!-- Home View -->
+  <!-- ================================================================ -->
+  <div class="view active" id="viewHome">
+    <div class="home-grid">
+      <button class="home-card" data-nav="checkin" style="--card-accent:#6b7db3">
+        <span class="home-card-icon"><i class="ri-checkbox-circle-fill"></i></span>
+        <span class="home-card-title">打卡</span>
+        <span class="home-card-desc">每日任务 · 统计</span>
+      </button>
+      <button class="home-card" data-nav="todo" style="--card-accent:#6b7db3">
+        <span class="home-card-icon"><i class="ri-list-check-3"></i></span>
+        <span class="home-card-title">待办</span>
+        <span class="home-card-desc">任务管理 · 分类</span>
+      </button>
+      <button class="home-card" data-nav="bookkeeping" style="--card-accent:#f59e0b">
+        <span class="home-card-icon"><i class="ri-exchange-dollar-fill"></i></span>
+        <span class="home-card-title">记账</span>
+        <span class="home-card-desc">收支记录 · 统计</span>
+      </button>
+      <button class="home-card" data-nav="body" style="--card-accent:#22c55e">
+        <span class="home-card-icon"><i class="ri-scales-fill"></i></span>
+        <span class="home-card-title">身材管理</span>
+        <span class="home-card-desc">体重 · 围度记录</span>
+      </button>
+      <button class="home-card" data-nav="diet" style="--card-accent:#f97316">
+        <span class="home-card-icon"><i class="ri-restaurant-2-fill"></i></span>
+        <span class="home-card-title">吃喝拉撒</span>
+        <span class="home-card-desc">饮食 · 饮水 · 排便</span>
+      </button>
+      <button class="home-card" data-nav="sleep" style="--card-accent:#8b5cf6">
+        <span class="home-card-icon"><i class="ri-moon-fill"></i></span>
+        <span class="home-card-title">睡眠记录</span>
+        <span class="home-card-desc">主睡眠 · 小憩</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Check-in View (打卡 + 统计) -->
+  <!-- ================================================================ -->
+  <div class="view" id="viewCheckin">
+    <div class="sub-nav">
+      <button class="sub-nav-item active" data-sub="checkinList"><i class="ri-checkbox-circle-fill"></i> 打卡</button>
+      <button class="sub-nav-item" data-sub="checkinStats"><i class="ri-bar-chart-fill"></i> 统计</button>
+    </div>
+    <div class="sub-view active" id="subCheckinList">
+      <div class="task-list" id="taskList"></div>
+      <div class="empty-state" id="emptyState" style="display:none">
+        <div class="empty-icon">📋</div>
+        <p>还没有任务，点击右下角 + 创建一个吧</p>
+      </div>
+    </div>
+    <div class="sub-view" id="subCheckinStats">
+      <div class="year-switcher">
+        <button id="yearPrev">◂</button>
+        <span class="year-label" id="yearLabel"></span>
+        <button id="yearNext">▸</button>
+      </div>
+      <div class="heatmap-wrap">
+        <div style="display:flex">
+          <div class="heatmap-labels-col" id="heatmapColLabels"></div>
+          <div>
+            <div class="heatmap-labels-row" id="heatmapRowLabels"></div>
+            <div class="heatmap-grid" id="heatmapGrid"></div>
+          </div>
+        </div>
+      </div>
+      <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+      <div style="margin-top:20px" id="statsTaskList"></div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Todo View -->
+  <!-- ================================================================ -->
+  <div class="view" id="viewTodo">
+    <div class="todo-pills-wrap">
+      <div class="todo-pills" id="todoPills"></div>
+    </div>
+    <div class="todo-list" id="todoList"></div>
+    <div class="empty-state" id="todoEmpty" style="display:none">
+      <div class="empty-icon">📝</div>
+      <p>还没有待办事项，点击右下角 + 创建</p>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Bookkeeping View (记账 | 记录 | 统计) -->
+  <!-- ================================================================ -->
+  <div class="view" id="viewBookkeeping">
+    <div class="sub-nav">
+      <button class="sub-nav-item active" data-bk-tab="add"><i class="ri-edit-circle-fill"></i> 记账</button>
+      <button class="sub-nav-item" data-bk-tab="records"><i class="ri-file-list-3-fill"></i> 记录</button>
+      <button class="sub-nav-item" data-bk-tab="stats"><i class="ri-pie-chart-fill"></i> 统计</button>
+    </div>
+
+    <!-- Tab 1: Add Record -->
+    <div class="sub-view active" id="bkAddView">
+      <div class="bk-section">
+        <div class="bk-section-title">支 出</div>
+        <div class="bk-cat-grid" id="bkExpenseGrid"></div>
+      </div>
+      <div class="bk-section">
+        <div class="bk-section-title">收 入</div>
+        <div class="bk-cat-grid" id="bkIncomeGrid"></div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Records Overview -->
+    <div class="sub-view" id="bkRecordsView">
+      <div class="bk-month-scroll-wrap">
+        <div class="bk-month-scroll" id="bkMonthScroll"></div>
+      </div>
+      <div class="bk-summary" id="bkSummary"></div>
+      <div class="bk-day-list" id="bkDayList"></div>
+      <div class="empty-state" id="bkRecordsEmpty" style="display:none">
+        <div class="empty-icon">📋</div>
+        <p>本月暂无记录</p>
+      </div>
+    </div>
+
+    <!-- Tab 3: Statistics -->
+    <div class="sub-view" id="bkStatsView">
+      <div class="bk-period-row">
+        <div class="bk-period-tabs" id="bkPeriodTabs"></div>
+      </div>
+      <div class="bk-period-scroll-wrap">
+        <div class="bk-period-scroll" id="bkPeriodScroll"></div>
+      </div>
+      <div class="bk-ranking" id="bkRanking"></div>
+      <div class="empty-state" id="bkStatsEmpty" style="display:none">
+        <div class="empty-icon">📊</div>
+        <p>该时段暂无支出记录</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Bookkeeping Category Detail View -->
+  <!-- ================================================================ -->
+  <div class="view" id="viewBookkeepingDetail">
+    <div class="bk-period-row">
+      <div class="bk-period-tabs" id="bkDetailPeriodTabs"></div>
+    </div>
+    <div class="bk-period-scroll-wrap">
+      <div class="bk-period-scroll" id="bkDetailPeriodScroll"></div>
+    </div>
+    <div class="bk-chart-wrap" id="bkChartWrap">
+      <svg class="bk-chart" id="bkChart" viewBox="0 0 600 200" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="bk-chart-labels" id="bkChartLabels"></div>
+    <div class="empty-state" id="bkDetailEmpty" style="display:none">
+      <div class="empty-icon">📊</div>
+      <p>该时段暂无此分类记录</p>
+    </div>
+  </div>
+
+  <!-- Offline indicator -->
+  <div id="offlineBadge" style="display:none;position:fixed;top:20px;right:20px;z-index:600;padding:6px 14px;border-radius:16px;background:rgba(201,122,60,0.9);color:#fff;font-size:0.75rem;font-weight:600;pointer-events:none">🟡 离线</div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Sleep View -->
+<!-- ================================================================ -->
+<div class="view" id="viewSleep">
+  <div class="sl-card" id="slTodayCard"></div>
+  <div class="sl-card sl-card-nap" id="slNapCard"></div>
+  <div class="sl-card" id="slStatsCard"></div>
+</div>
+
+<!-- Sleep Record Modal -->
+<div class="modal-overlay" id="slModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="slModalTitle">新增睡眠记录</div>
+    <div class="form-group">
+      <label class="form-label">睡眠类型</label>
+      <div class="sl-type-toggle" id="slTypeToggle">
+        <button class="sl-type-opt selected" data-type="main">主睡眠</button>
+        <button class="sl-type-opt" data-type="nap">小憩</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">日期</label>
+      <input class="form-input" id="slDateInput" type="date">
+    </div>
+    <div class="sl-time-row">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">入睡时间 *</label>
+        <input class="form-input" id="slSleepTimeInput" type="time" required>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">起床时间 *</label>
+        <input class="form-input" id="slWakeTimeInput" type="time" required>
+      </div>
+    </div>
+    <div class="sl-duration-preview" id="slDurationPreview"></div>
+    <div class="form-group">
+      <label class="form-label">睡眠评价（选填）</label>
+      <div class="sl-opt-row" id="slRatingRow">
+        <button class="sl-opt-btn" data-val="很好">很好</button>
+        <button class="sl-opt-btn" data-val="睡太多了">睡太多了</button>
+        <button class="sl-opt-btn" data-val="没睡够">没睡够</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">睡眠质量（选填）</label>
+      <div class="sl-opt-row" id="slQualityRow">
+        <button class="sl-opt-btn" data-val="1次起夜">1次起夜</button>
+        <button class="sl-opt-btn" data-val="2次起夜">2次起夜</button>
+        <button class="sl-opt-btn" data-val="多次起夜">多次起夜</button>
+      </div>
+    </div>
+    <button class="form-submit" id="slFormSubmit">保存</button>
+  </div>
+</div>
+
+<!-- Diet View (吃喝拉撒) -->
+<!-- ================================================================ -->
+<div class="view" id="viewDiet">
+  <div class="sub-nav" id="dietTabs">
+    <button class="sub-nav-item active" data-tab="eating"><i class="ri-restaurant-2-fill"></i> 吃饭</button>
+    <button class="sub-nav-item" data-tab="drinking"><i class="ri-cup-fill"></i> 喝水</button>
+    <button class="sub-nav-item" data-tab="bathroom"><i class="ri-archive-drawer-fill"></i> 拉屎</button>
+  </div>
+  <div class="diet-date-track" id="dietDateTrack"></div>
+
+  <!-- Eating Tab -->
+  <div class="diet-panel active" id="dietPanelEating">
+    <div class="diet-overview" id="dietOverview"></div>
+    <div class="diet-meals" id="dietMeals"></div>
+    <div class="diet-fab-row" id="dietFabRow">
+      <button class="diet-fab-btn" data-meal="breakfast">+ 早餐</button>
+      <button class="diet-fab-btn" data-meal="lunch">+ 午餐</button>
+      <button class="diet-fab-btn" data-meal="dinner">+ 晚饭</button>
+      <button class="diet-fab-btn" data-meal="snack">+ 加餐</button>
+    </div>
+  </div>
+
+  <!-- Drinking Tab -->
+  <div class="diet-panel" id="dietPanelDrinking">
+    <div class="drink-body-wrap" id="drinkBodyWrap">
+      <div class="drink-pour-stream" id="drinkPourStream"></div>
+      <svg class="drink-body-svg" viewBox="0 0 200 300">
+        <defs>
+          <clipPath id="drinkBodyClip">
+            <path id="drinkBodyPath" d="M100 20 C125 20,132 42,130 64 C128 82,122 95,118 102 L120 108 C148 115,158 135,156 165 L154 210 C152 240,150 260,150 280 L150 292 L130 292 L130 250 L100 240 L70 250 L70 292 L50 292 L50 280 C50 260,48 240,46 210 L44 165 C42 135,52 115,80 108 L82 102 C78 95,72 82,70 64 C68 42,75 20,100 20 Z"/>
+          </clipPath>
+          <linearGradient id="drinkWaterGrad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.9"/>
+            <stop offset="50%" stop-color="#3b82f6" stop-opacity="0.7"/>
+            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.4"/>
+          </linearGradient>
+        </defs>
+        <!-- body outline (Lucide style: stroke-based, clean lines) -->
+        <use href="#drinkBodyPath" class="drink-body-outline"/>
+        <!-- water fill (clipped to body) -->
+        <rect class="drink-water" id="drinkWater" x="0" y="300" width="200" height="0" fill="url(#drinkWaterGrad)" clip-path="url(#drinkBodyClip)"/>
+        <!-- water surface -->
+        <ellipse class="drink-surface" id="drinkSurface" cx="100" cy="300" rx="50" ry="5"/>
+        <!-- 80% line (neck level ≈ y=102) -->
+        <line class="drink-qualify-line" x1="42" y1="102" x2="158" y2="102"/>
+        <text class="drink-qualify-label" x="162" y="106">合格</text>
+        <!-- center text -->
+        <text class="drink-stat-val" id="drinkStatVal" x="100" y="165">0</text>
+        <text class="drink-stat-unit" x="100" y="185">ml / 2500</text>
+      </svg>
+    </div>
+    <div class="drink-btns">
+      <button class="drink-btn" data-ml="200"><i class="ri-cup-fill"></i><span>200ml</span></button>
+      <button class="drink-btn" data-ml="500"><i class="ri-goblet-fill"></i><span>500ml</span></button>
+      <button class="drink-btn" data-ml="1500"><i class="ri-contrast-drop-fill"></i><span>1500ml</span></button>
+    </div>
+    <button class="drink-undo-btn" id="drinkUndoBtn"><i class="ri-arrow-go-back-line"></i> 点错了</button>
+  </div>
+
+  <!-- Bathroom Tab -->
+  <div class="diet-panel" id="dietPanelBathroom">
+    <div class="br-time-since" id="brTimeSince"></div>
+    <div class="br-poop-wrap" id="brPoopWrap">💩</div>
+    <p class="br-hint" id="brHint">点击便便记录排便</p>
+    <div class="br-calendar" id="brCalendar"></div>
+  </div>
+</div>
+
+<!-- Bathroom Day Records Modal -->
+<div class="modal-overlay" id="brDayModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="brDayModalTitle"></div>
+    <div class="br-day-list" id="brDayList"></div>
+  </div>
+</div>
+
+<!-- Bathroom Record Modal -->
+<div class="modal-overlay" id="brModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">记录排便</div>
+    <div class="form-group">
+      <label class="form-label">日期</label>
+      <input class="form-input" id="brDateInput" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">时间</label>
+      <input class="form-input" id="brTimeInput" type="time">
+    </div>
+    <div class="form-group">
+      <label class="form-label">形状</label>
+      <div class="br-opt-grid" id="brShapeGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">颜色</label>
+      <div class="br-opt-grid" id="brColorGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">分量</label>
+      <div class="br-opt-grid" id="brAmountGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">排便感觉</label>
+      <div class="br-opt-grid" id="brFeelingGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">气味</label>
+      <div class="br-opt-grid" id="brSmellGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">排便时长</label>
+      <div class="br-opt-grid" id="brDurationGrid"></div>
+    </div>
+    <button class="form-submit" id="brFormSubmit">保存</button>
+  </div>
+</div>
+
+<!-- Diet Settings Modal -->
+<div class="modal-overlay" id="dietSettingsOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">摄入目标设置</div>
+    <div class="form-group">
+      <label class="form-label">每日摄入目标（千焦）</label>
+      <input class="form-input" id="dietTargetInput" type="number" step="100" min="1000" max="50000" placeholder="默认 8000 千焦" inputmode="decimal">
+    </div>
+    <button class="form-submit" id="dietSettingsSubmit">保存</button>
+  </div>
+</div>
+
+<!-- Diet Add Food Modal -->
+<div class="modal-overlay" id="dietAddOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="dietAddTitle">添加食物</div>
+    <div class="diet-add-rows" id="dietAddRows"></div>
+    <button class="diet-add-more" id="dietAddMore"><i class="ri-add-fill"></i> 再加一条</button>
+    <div class="form-group">
+      <label class="form-label">日期</label>
+      <input class="form-input" id="dietAddDate" type="date">
+    </div>
+    <button class="form-submit" id="dietAddSubmit">保存</button>
+  </div>
+</div>
+
+<!-- Diet Edit Food Modal -->
+<div class="modal-overlay" id="dietEditOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">编辑食物</div>
+    <div class="form-group">
+      <label class="form-label">食物名称</label>
+      <input class="form-input" id="dietEditName" placeholder="例如：米饭">
+    </div>
+    <div class="form-group">
+      <label class="form-label">克数（选填）</label>
+      <input class="form-input" id="dietEditWeight" type="number" step="1" min="1" placeholder="例如：200" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">热量（千焦）*</label>
+      <input class="form-input" id="dietEditCalories" type="number" step="10" min="1" placeholder="例如：1123" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">碳水（克，选填）</label>
+      <input class="form-input" id="dietEditCarbs" type="number" step="0.1" min="0" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">蛋白质（克，选填）</label>
+      <input class="form-input" id="dietEditProtein" type="number" step="0.1" min="0" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">脂肪（克，选填）</label>
+      <input class="form-input" id="dietEditFat" type="number" step="0.1" min="0" placeholder="0" inputmode="decimal">
+    </div>
+    <button class="form-submit" id="dietEditSubmit">保存</button>
+  </div>
+</div>
+
+<!-- Body Measurement View -->
+<!-- ================================================================ -->
+<div class="view" id="viewBodyMeasurement">
+  <div class="bm-controls">
+    <button class="bm-add-btn" id="bmAddBtn"><i class="ri-add-fill"></i> 新增数据</button>
+    <div class="bm-range-toggle" id="bmRangeToggle">
+      <button class="bm-range-opt active" data-range="7d">近7天</button>
+      <button class="bm-range-opt" data-range="30d">近30天</button>
+      <button class="bm-range-opt" data-range="1y">近一年</button>
+    </div>
+  </div>
+  <div class="bm-charts" id="bmCharts"></div>
+</div>
+
+<!-- Body Measurement Add Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="bmModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">新增身材数据</div>
+    <div class="form-group">
+      <label class="form-label">数据类型</label>
+      <div class="bm-type-grid" id="bmTypeGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">数值</label>
+      <input class="form-input" id="bmValueInput" type="number" step="0.1" min="0.1" max="999" placeholder="输入数值" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">日期</label>
+      <input class="form-input" id="bmDateInput" type="date">
+    </div>
+    <button class="form-submit" id="bmFormSubmit">保存</button>
+  </div>
+</div>
+
+<!-- FAB -->
+<!-- ================================================================ -->
+<button class="fab" id="fabBtn"><i class="ri-add-fill"></i></button>
+
+<!-- ================================================================ -->
+<!-- Check-in Task Form Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="taskModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="taskModalTitle">新建任务</div>
+    <div class="form-group">
+      <label class="form-label">任务名称</label>
+      <input class="form-input" id="taskNameInput" placeholder="例如：背单词" maxlength="30">
+    </div>
+    <div class="form-group">
+      <label class="form-label">每日次数</label>
+      <input class="form-input" id="taskCountInput" type="number" min="1" max="99" value="1">
+    </div>
+    <div class="form-group">
+      <label class="form-label">主题颜色</label>
+      <div class="color-presets" id="colorPresets"></div>
+      <input class="form-input" id="taskColorInput" type="color" value="#6b7db3" style="margin-top:8px;height:36px;padding:2px 8px">
+    </div>
+    <button class="form-submit" id="taskFormSubmit">保存</button>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Confirm Dialog -->
+<!-- ================================================================ -->
+<div class="dialog-overlay" id="confirmDialog">
+  <div class="dialog-box">
+    <div class="dialog-text" id="confirmText"></div>
+    <div class="dialog-buttons">
+      <button class="btn-cancel" id="confirmCancel">取消</button>
+      <button class="btn-danger" id="confirmOk">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Check-in Backfill Sheet -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="backfillOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">补打卡</div>
+    <div class="backfill-dates" id="backfillDates"></div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Todo Form Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="todoModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="todoModalTitle">新建待办</div>
+    <div class="form-group">
+      <label class="form-label">待办事项 *</label>
+      <input class="form-input" id="todoTitleInput" placeholder="例如：提交Q2报告" maxlength="60">
+    </div>
+    <div class="form-group">
+      <label class="form-label">详细描述</label>
+      <textarea class="form-input" id="todoDescInput" placeholder="可选，添加备注说明" rows="3" style="resize:none"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">截止时间</label>
+      <div class="datetime-row">
+        <input class="form-input" id="todoDateInput" type="date">
+        <input class="form-input" id="todoTimeInput" type="time" placeholder="时间(选填)">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">优先级</label>
+      <div class="priority-toggle" id="priorityToggle">
+        <button class="priority-opt low" data-priority="low">🟢 低</button>
+        <button class="priority-opt medium selected" data-priority="medium">🟡 中</button>
+        <button class="priority-opt high" data-priority="high">🔴 高</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">待办分类 *</label>
+      <select class="form-select" id="todoCategorySelect"></select>
+    </div>
+    <button class="form-submit" id="todoFormSubmit">保存</button>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Todo Category Management Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="catModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">管理分类</div>
+    <div class="cat-list" id="catList"></div>
+    <button class="form-submit" id="catAddBtn" style="margin-top:16px">+ 新建分类</button>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Todo Category Edit Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="catEditOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="catEditTitle">编辑分类</div>
+    <div class="form-group">
+      <label class="form-label">分类名称</label>
+      <input class="form-input" id="catNameInput" placeholder="分类名称" maxlength="12">
+    </div>
+    <div class="form-group">
+      <label class="form-label">颜色</label>
+      <div class="color-presets" id="catColorPresets"></div>
+      <input class="form-input" id="catColorInput" type="color" value="#6b7db3" style="margin-top:8px;height:36px;padding:2px 8px">
+    </div>
+    <button class="form-submit" id="catEditSubmit">保存</button>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Todo Postpone Dialog -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="postponeOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">延期至</div>
+    <div class="form-group">
+      <label class="form-label">新截止日期</label>
+      <div class="datetime-row">
+        <input class="form-input" id="postponeDateInput" type="date">
+        <input class="form-input" id="postponeTimeInput" type="time" placeholder="时间(选填)">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="form-submit" id="postponeClear" style="background:var(--input-bg);color:var(--text);flex:1">清除截止时间</button>
+      <button class="form-submit" id="postponeSubmit" style="flex:1">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Bookkeeping Amount Calculator Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="bkAmountOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="bk-amount-header">
+      <span class="bk-amount-icon" id="bkAmountIcon"></span>
+      <span class="bk-amount-cat" id="bkAmountCat"></span>
+    </div>
+    <div class="bk-amount-display" id="bkAmountDisplay">0</div>
+    <div class="bk-calc-grid">
+      <button class="bk-calc-btn" data-key="7">7</button>
+      <button class="bk-calc-btn" data-key="8">8</button>
+      <button class="bk-calc-btn" data-key="9">9</button>
+      <button class="bk-calc-btn bk-calc-op" data-key="+">+</button>
+      <button class="bk-calc-btn" data-key="4">4</button>
+      <button class="bk-calc-btn" data-key="5">5</button>
+      <button class="bk-calc-btn" data-key="6">6</button>
+      <button class="bk-calc-btn bk-calc-op" data-key="-">−</button>
+      <button class="bk-calc-btn" data-key="1">1</button>
+      <button class="bk-calc-btn" data-key="2">2</button>
+      <button class="bk-calc-btn" data-key="3">3</button>
+      <button class="bk-calc-btn bk-calc-clr" data-key="C">C</button>
+      <button class="bk-calc-btn" data-key="0">0</button>
+      <button class="bk-calc-btn" data-key=".">.</button>
+      <button class="bk-calc-btn bk-calc-ok" data-key="=">✓</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">日期</label>
+      <input class="form-input" id="bkDateInput" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注</label>
+      <input class="form-input" id="bkNoteInput" placeholder="选填" maxlength="60">
+    </div>
+    <button class="form-submit" id="bkAmountSubmit">保存</button>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Bookkeeping Category Edit Modal (click icon on record) -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="bkCatEditOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">选择分类</div>
+    <div class="bk-section">
+      <div class="bk-section-title">支 出</div>
+      <div class="bk-cat-grid bk-cat-select" id="bkCatEditExpense"></div>
+    </div>
+    <div class="bk-section">
+      <div class="bk-section-title">收 入</div>
+      <div class="bk-cat-grid bk-cat-select" id="bkCatEditIncome"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Bookkeeping Note Edit Modal (click title on record) -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="bkNoteEditOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">编辑备注</div>
+    <div class="form-group">
+      <label class="form-label">备注内容</label>
+      <input class="form-input" id="bkNoteEditInput" placeholder="备注（留空则显示分类名）" maxlength="60">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="form-submit" id="bkNoteClear" style="background:var(--input-bg);color:var(--text);flex:1">清除备注</button>
+      <button class="form-submit" id="bkNoteSave" style="flex:1">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- User Panel Overlay -->
+<!-- ================================================================ -->
+<div class="user-panel-overlay" id="userPanelOverlay">
+  <div class="user-panel">
+    <div class="user-panel-header">
+      <button class="user-panel-avatar-btn" id="userPanelAvatarBtn">
+        <span id="userPanelAvatar">👤</span>
+      </button>
+      <div class="user-panel-info">
+        <div class="user-panel-nickname" id="userPanelNickname">用户</div>
+        <div class="user-panel-email" id="userPanelEmail"></div>
+      </div>
+    </div>
+    <div class="user-panel-actions">
+      <button class="user-panel-action" id="userPanelEditAvatar"><i class="ri-image-edit-fill"></i> 更换头像</button>
+      <button class="user-panel-action" id="userPanelEditName"><i class="ri-edit-fill"></i> 修改昵称</button>
+    </div>
+    <div class="user-panel-row">
+      <button class="user-panel-action" id="userPanelExport"><i class="ri-file-download-fill"></i> 导出</button>
+      <button class="user-panel-action" id="userPanelImport"><i class="ri-file-upload-fill"></i> 导入</button>
+    </div>
+    <div class="user-panel-footer">
+      <button class="user-panel-logout" id="userPanelLogout"><i class="ri-logout-box-r-fill"></i> 退出登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Avatar Emoji Picker Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="avatarPickerOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">选择头像</div>
+    <div class="emoji-grid" id="emojiGrid"></div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Nickname Edit Modal -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="nicknameEditOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">修改昵称</div>
+    <div class="form-group">
+      <label class="form-label">昵称</label>
+      <input class="form-input" id="nicknameEditInput" placeholder="你的昵称" maxlength="20">
+    </div>
+    <button class="form-submit" id="nicknameEditSubmit">保存</button>
+  </div>
+</div>
+
+<!-- Checkmark Animation Container -->
+<div id="checkmarkContainer"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="importFileInput" accept=".json" style="display:none">
+
+<!-- PocketBase SDK (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/pocketbase@0.23.0/dist/pocketbase.umd.js"></script>
+
+<!-- Application Modules (order matters) -->
+<script src="js/pocketbase-client.js"></script>
+<script src="js/db.js"></script>
+<script src="js/offline.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/migrate.js"></script>
+<script src="js/app.js"></script>
+<script src="js/checkin.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/todo.js"></script>
+<script src="js/bookkeeping.js"></script>
+<script src="js/body-measurement.js"></script>
+<script src="js/diet.js"></script>
+<script src="js/sleep.js"></script>
+
+</body>
+</html>
