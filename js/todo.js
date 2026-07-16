@@ -15,11 +15,11 @@ const DEFAULT_CATEGORIES = [
 async function loadTodoCategoriesOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('todo_categories').select('*').eq('user_id', uid).order('created_at');
-      if (!res.error && res.data.length > 0) {
-        todoCategories = res.data.map(function(r) { return { id: r.id, name: r.name, color: r.color, createdAt: new Date(r.created_at).getTime() }; });
+      var res = await pb.collection('todo_categories').getFullList({filter: 'user_id="' + pbEscape(uid) + '"', sort: '+created_at'});
+      if (res && res.length > 0) {
+        todoCategories = res.map(function(r) { return { id: r.id, name: r.name, color: r.color, createdAt: new Date(r.created_at).getTime() }; });
         if (uid) dbCacheSave(uid, 'checkin_cache_todo_categories', todoCategories);
         return;
       }
@@ -34,7 +34,7 @@ async function loadTodoCategoriesOnline() {
   if (isOnline && authUser) {
     for (var i = 0; i < todoCategories.length; i++) {
       var c = todoCategories[i];
-      try { await getSupabase().from('todo_categories').upsert({ id: c.id, user_id: authUser.id, name: c.name, color: c.color, created_at: new Date(0).toISOString() }); } catch(e) {}
+      try { await pbUpsert('todo_categories', { id: c.id, user_id: authUser.id, name: c.name, color: c.color, created_at: new Date(0).toISOString() }, 'id="' + pbEscape(String(c.id)) + '"'); } catch(e) {}
     }
   }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_todo_categories', todoCategories);
@@ -42,7 +42,7 @@ async function loadTodoCategoriesOnline() {
 
 async function saveCategoryToServer(cat) {
   if (isOnline) {
-    try { await getSupabase().from('todo_categories').upsert({ id: cat.id, user_id: authUser.id, name: cat.name, color: cat.color, created_at: new Date(cat.createdAt).toISOString() }); }
+    try { await pbUpsert('todo_categories', { id: cat.id, user_id: authUser.id, name: cat.name, color: cat.color, created_at: new Date(cat.createdAt).toISOString() }, 'id="' + pbEscape(String(cat.id)) + '"'); }
     catch(e) { queuePush({ _module: 'todo', type: 'updateCategory', id: cat.id, name: cat.name, color: cat.color }); }
   } else { queuePush({ _module: 'todo', type: 'updateCategory', id: cat.id, name: cat.name, color: cat.color }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_todo_categories', todoCategories);
@@ -50,7 +50,7 @@ async function saveCategoryToServer(cat) {
 
 async function deleteCategoryFromServer(catId) {
   if (isOnline) {
-    try { await getSupabase().from('todo_categories').delete().eq('id', catId).eq('user_id', authUser.id); }
+    try { await getPB().collection('todo_categories').delete(String(catId)); }
     catch(e) { queuePush({ _module: 'todo', type: 'deleteCategory', id: catId }); }
   } else { queuePush({ _module: 'todo', type: 'deleteCategory', id: catId }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_todo_categories', todoCategories);
@@ -59,14 +59,14 @@ async function deleteCategoryFromServer(catId) {
 async function loadTodoItemsOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('todo_items').select('*').eq('user_id', uid).order('created_at');
-      if (!res.error) {
-        todoItems = res.data.map(function(r) { return { id: r.id.toString(), categoryId: r.category_id, title: r.title, description: r.description || '', deadline: r.deadline || null, priority: r.priority, status: r.status, createdAt: new Date(r.created_at).getTime(), completedAt: r.completed_at ? new Date(r.completed_at).getTime() : null }; });
+      var res = await pb.collection('todo_items').getFullList({filter: 'user_id="' + pbEscape(uid) + '"', sort: '+created_at'});
+      
+        todoItems = res.map(function(r) { return { id: r.id.toString(), categoryId: r.category_id, title: r.title, description: r.description || '', deadline: r.deadline || null, priority: r.priority, status: r.status, createdAt: new Date(r.created_at).getTime(), completedAt: r.completed_at ? new Date(r.completed_at).getTime() : null }; });
         if (uid) dbCacheSave(uid, 'checkin_cache_todo_items', todoItems);
         return;
-      }
+    }
     } catch(e) { /* fallback */ }
   }
   if (authUser && typeof cacheGetTodoItems === 'function') {
@@ -79,7 +79,7 @@ async function loadTodoItemsOnline() {
 async function saveTodoItemToServer(item) {
   if (isOnline) {
     try {
-      await getSupabase().from('todo_items').upsert({ id: parseInt(item.id), user_id: authUser.id, category_id: item.categoryId, title: item.title, description: item.description || '', deadline: item.deadline || null, priority: item.priority, status: item.status, created_at: new Date(item.createdAt).toISOString(), completed_at: item.completedAt ? new Date(item.completedAt).toISOString() : null });
+      await pbUpsert('todo_items', { id: parseInt(item.id), user_id: authUser.id, category_id: item.categoryId, title: item.title, description: item.description || '', deadline: item.deadline || null, priority: item.priority, status: item.status, created_at: new Date(item.createdAt).toISOString(), completed_at: item.completedAt ? new Date(item.completedAt).toISOString() : null }, 'id="' + pbEscape(String(parseInt(item.id))) + '"');
     } catch(e) {
       queuePush({ _module: 'todo', type: 'updateTodo', id: parseInt(item.id), title: item.title, description: item.description, deadline: item.deadline, priority: item.priority, categoryId: item.categoryId, status: item.status, completedAt: item.completedAt });
     }
@@ -91,7 +91,7 @@ async function saveTodoItemToServer(item) {
 
 async function deleteTodoItemFromServer(todoId) {
   if (isOnline) {
-    try { await getSupabase().from('todo_items').delete().eq('id', parseInt(todoId)).eq('user_id', authUser.id); }
+    try { await getPB().collection('todo_items').delete(String(parseInt(todoId))).eq('user_id', authUser.id); }
     catch(e) { queuePush({ _module: 'todo', type: 'deleteTodo', id: parseInt(todoId) }); }
   } else { queuePush({ _module: 'todo', type: 'deleteTodo', id: parseInt(todoId) }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_todo_items', todoItems);
@@ -325,7 +325,6 @@ async function saveTodoItemForm() {
       todoItems[idx].deadline = deadline;
       todoItems[idx].priority = priority;
       todoItems[idx].categoryId = catId;
-    }
   } else {
     todoItems.push({
       id: Date.now().toString(), categoryId: catId, title: title,
@@ -553,37 +552,37 @@ DataModule({
     }
   ],
   actions: {
-    createTodo: async function(sb, uid, a) {
-      await sb.from('todo_items').upsert({
+    createTodo: async function(pb, uid, a) {
+      pbUpsert('todo_items', {
         id: a.id, user_id: uid, category_id: a.categoryId || null,
         title: a.title, description: a.description || '',
         deadline: a.deadline || null, priority: a.priority || 'medium',
         status: a.status || 'pending', created_at: new Date(a.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(a.id)) + '"');
     },
-    updateTodo: async function(sb, uid, a) {
-      await sb.from('todo_items').update({
+    updateTodo: async function(pb, uid, a) {
+      await pb.collection('todo_items').update({
         title: a.title, description: a.description, deadline: a.deadline,
         priority: a.priority, category_id: a.categoryId, status: a.status,
         completed_at: a.completedAt ? new Date(a.completedAt).toISOString() : null
-      }).eq('id', a.id).eq('user_id', uid);
+      }).eq('id', a.id);
     },
-    deleteTodo: async function(sb, uid, a) {
-      await sb.from('todo_items').delete().eq('id', a.id).eq('user_id', uid);
+    deleteTodo: async function(pb, uid, a) {
+      await pb.collection('todo_items').delete(String(a.id));
     },
-    createCategory: async function(sb, uid, a) {
-      await sb.from('todo_categories').upsert({
+    createCategory: async function(pb, uid, a) {
+      pbUpsert('todo_categories', {
         id: a.id, user_id: uid, name: a.name, color: a.color,
         created_at: new Date(a.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(a.id)) + '"');
     },
-    updateCategory: async function(sb, uid, a) {
-      await sb.from('todo_categories').update({
+    updateCategory: async function(pb, uid, a) {
+      await pb.collection('todo_categories').update({
         name: a.name, color: a.color
-      }).eq('id', a.id).eq('user_id', uid);
+      }).eq('id', a.id);
     },
-    deleteCategory: async function(sb, uid, a) {
-      await sb.from('todo_categories').delete().eq('id', a.id).eq('user_id', uid);
+    deleteCategory: async function(pb, uid, a) {
+      await pb.collection('todo_categories').delete(String(a.id));
     }
   },
   init: function() {
@@ -594,10 +593,10 @@ DataModule({
       todoCategories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
       for (var i = 0; i < todoCategories.length; i++) {
         var c = todoCategories[i];
-        getSupabase().from('todo_categories').upsert({
+        pbUpsert('todo_categories', {
           id: c.id, user_id: authUser.id, name: c.name,
           color: c.color, created_at: new Date(0).toISOString()
-        }).catch(function(){});
+        }, 'id="' + pbEscape(String(c.id)) + '"').catch(function(){});
       }
       dbCacheSave(authUser.id, 'checkin_cache_todo_categories', todoCategories);
       todoState.todoCategories = todoCategories;
@@ -631,24 +630,24 @@ DataModule({
     var catIds = {};
     if (data.todoCategories) for (var i = 0; i < data.todoCategories.length; i++) {
       var c = data.todoCategories[i];
-      var res = await sb.from('todo_categories').upsert({
+      var res = pbUpsert('todo_categories', {
         id: c.id, user_id: uid, name: c.name, color: c.color,
         created_at: new Date(c.createdAt || Date.now()).toISOString()
-      });
+      }, 'id="' + pbEscape(String(c.id)) + '"');
       catIds[c.id] = true;
-      if (res.error) errors++; else inserted++;
+      inserted++;
     }
     if (data.todoItems) for (var j = 0; j < data.todoItems.length; j++) {
       var item = data.todoItems[j];
-      var res2 = await sb.from('todo_items').upsert({
+      var res2 = pbUpsert('todo_items', {
         id: parseInt(item.id) || (Date.now() + j + 1000), user_id: uid,
         category_id: item.categoryId || null, title: item.title,
         description: item.description || '', deadline: item.deadline || null,
         priority: item.priority || 'medium', status: item.status || 'pending',
         created_at: new Date(item.createdAt || Date.now()).toISOString(),
         completed_at: item.completedAt ? new Date(item.completedAt).toISOString() : null
-      });
-      if (res2.error) errors++; else inserted++;
+      }, 'id="' + pbEscape(String(parseInt(item.id) || (Date.now() + j + 1000))) + '"');
+      inserted++;
     }
     return { inserted: inserted, errors: errors };
   },

@@ -55,10 +55,10 @@ async function saveDietSettings() {
   dbCacheSave(authUser.id, 'checkin_cache_diet_settings', dietSettings);
   if (isOnline) {
     try {
-      await getSupabase().from('diet_settings').upsert({
+      await pbUpsert('diet_settings', {
         user_id: authUser.id, daily_calorie_target: dietSettings.daily_calorie_target,
         updated_at: new Date().toISOString()
-      });
+      }, 'user_id="' + pbEscape(authUser.id) + '"');
     } catch(e) {}
   }
 }
@@ -66,18 +66,17 @@ async function saveDietSettings() {
 async function loadFoodItemsOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('food_items').select('*').eq('user_id', uid).order('created_at');
-      if (!res.error) {
-        foodItems = res.data.map(function(r) {
+      var res = await pb.collection('food_items').getFullList({filter: 'user_id="' + pbEscape(uid) + '"', sort: '+created_at'});
+      
+        foodItems = res.map(function(r) {
           return { id: r.id.toString(), mealType: r.meal_type, name: r.name, weight: parseFloat(r.weight) || 0,
             calories: parseFloat(r.calories), carbs: parseFloat(r.carbs) || 0, protein: parseFloat(r.protein) || 0,
             fat: parseFloat(r.fat) || 0, date: r.date, createdAt: new Date(r.created_at).getTime() };
         });
         if (uid) dbCacheSave(uid, 'checkin_cache_food_items', foodItems);
         return;
-      }
     } catch(e) {}
   }
   if (authUser) {
@@ -90,12 +89,12 @@ async function loadFoodItemsOnline() {
 async function saveFoodItemToServer(item) {
   if (isOnline) {
     try {
-      await getSupabase().from('food_items').upsert({
+      await pbUpsert('food_items', {
         id: parseInt(item.id), user_id: authUser.id, meal_type: item.mealType,
         name: item.name, weight: item.weight || 0, calories: item.calories,
         carbs: item.carbs || 0, protein: item.protein || 0, fat: item.fat || 0,
         date: item.date, created_at: new Date(item.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(parseInt(item.id))) + '"');
     } catch(e) {
       queuePush({ _module: 'diet', type: 'upsertItem', id: parseInt(item.id), mealType: item.mealType,
         name: item.name, weight: item.weight, calories: item.calories,
@@ -112,7 +111,7 @@ async function saveFoodItemToServer(item) {
 async function deleteFoodItemFromServer(itemId) {
   foodItems = foodItems.filter(function(r) { return r.id !== itemId; });
   if (isOnline) {
-    try { await getSupabase().from('food_items').delete().eq('id', parseInt(itemId)).eq('user_id', authUser.id); }
+    try { await getPB().collection('food_items').delete(String(parseInt(itemId))).eq('user_id', authUser.id); }
     catch(e) { queuePush({ _module: 'diet', type: 'deleteItem', id: parseInt(itemId) }); }
   } else { queuePush({ _module: 'diet', type: 'deleteItem', id: parseInt(itemId) }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_food_items', foodItems);
@@ -851,15 +850,15 @@ DataModule({
     }
   }],
   actions: {
-    upsertItem: async function(sb, uid, a) {
-      await sb.from('food_items').upsert({
+    upsertItem: async function(pb, uid, a) {
+      pbUpsert('food_items', {
         id: a.id, user_id: uid, meal_type: a.mealType, name: a.name, weight: a.weight || 0,
         calories: a.calories, carbs: a.carbs || 0, protein: a.protein || 0, fat: a.fat || 0,
         date: a.date, created_at: new Date(a.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(a.id)) + '"');
     },
-    deleteItem: async function(sb, uid, a) {
-      await sb.from('food_items').delete().eq('id', a.id).eq('user_id', uid);
+    deleteItem: async function(pb, uid, a) {
+      await pb.collection('food_items').delete(String(a.id));
     }
   },
   init: function() {
@@ -964,13 +963,13 @@ DataModule({
     var items = data.foodItems, inserted = 0, errors = 0;
     for (var i = 0; i < items.length; i++) {
       var r = items[i];
-      var res = await sb.from('food_items').upsert({
+      var res = pbUpsert('food_items', {
         id: parseInt(r.id) || (Date.now() + i), user_id: uid, meal_type: r.mealType || r.meal_type || 'lunch',
         name: r.name, weight: r.weight || 0, calories: r.calories,
         carbs: r.carbs || 0, protein: r.protein || 0, fat: r.fat || 0,
         date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString()
-      });
-      if (res.error) errors++; else inserted++;
+      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      inserted++;
     }
     return { inserted: inserted, errors: errors };
   },

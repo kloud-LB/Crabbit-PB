@@ -324,15 +324,11 @@ async function init() {
   bindModuleEvents();
   bindUserPanelEvents();
 
-  // ====== AUTH BYPASSED (guest mode) ======
-  // var loggedIn = await initAuth();
-  // if (!loggedIn) return;
-  authUser = { id: 'guest_' + Date.now(), email: '' };
-  userProfile = { nickname: '本地用户', avatar: '🦀' };
-  document.body.classList.add('is-authed');
-  document.body.classList.remove('is-guest');
+  // Auth required — login via PocketBase
+  var loggedIn = await initAuth();
+  if (!loggedIn) return;
+
   onUserReady();
-  // ====== END AUTH BYPASS ======
 
   // Bind migration import
   bindMigrateImport();

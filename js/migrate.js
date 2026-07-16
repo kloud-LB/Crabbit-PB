@@ -1,5 +1,5 @@
 /* ================================================================
-   migrate.js — v1.x localStorage 数据迁移到 Supabase
+   migrate.js — v1.x localStorage 数据迁移到 PocketBase
    ================================================================ */
 
 async function migrateFromJSON(file) {
@@ -11,7 +11,7 @@ async function migrateFromJSON(file) {
         throw new Error('格式无效（无法识别的备份文件）');
       }
 
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
       if (!uid) { showToast('请先登录'); return; }
 
@@ -26,10 +26,10 @@ async function migrateFromJSON(file) {
       showToast('正在迁移中...', 6000);
 
       // Unified migration via module registry
-      var results = await dbMigrateAll(data, sb, uid);
+      var results = await dbMigrateAll(data, pb, uid);
 
       // Refresh caches and reload
-      await dbRefreshAllCaches(sb, uid);
+      await dbRefreshAllCaches(pb, uid);
       dbLoadAll(uid);
 
       var total = 0;

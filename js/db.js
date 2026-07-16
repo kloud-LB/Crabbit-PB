@@ -1,9 +1,9 @@
 /* ================================================================
-   db.js — 通用数据引擎
+   db.js — 通用数据引擎（PocketBase 后端）
    - 模块注册：DataModule(descriptor)
    - 缓存优先加载：dbLoadAll(uid)
-   - 并行缓存刷新：dbRefreshAllCaches(sb, uid)
-   - 表驱动队列重放：dbReplayAction(sb, uid, action)
+   - 并行缓存刷新：dbRefreshAllCaches(pb, uid)
+   - 表驱动队列重放：dbReplayAction(pb, uid, action)
    - 统一调度：dbRenderView / dbMigrateAll / dbExportAll
    ================================================================ */
 
@@ -77,11 +77,11 @@ function dbLoadAll(uid) {
     }
   }
 
-  // Step 3: 后台从 Supabase 并行刷新
+  // Step 3: 后台从 PocketBase 并行刷新
   if (typeof isOnline !== 'undefined' && isOnline) {
-    var sb;
-    try { sb = getSupabase(); } catch(e) { return; }
-    dbRefreshAllCaches(sb, uid).then(function() {
+    var pb;
+    try { pb = getPB(); } catch(e) { return; }
+    dbRefreshAllCaches(pb, uid).then(function() {
       // 用最新缓存重新装载
       for (modId in __modules) {
         var mod2 = __modules[modId];
@@ -102,19 +102,24 @@ function dbLoadAll(uid) {
 
 // ================================================================
 // 并行缓存刷新（Promise.all 所有注册表）
+// 改用 PocketBase: pb.collection(table).getFullList({ filter, sort })
 // ================================================================
 
-function dbRefreshAllCaches(sb, uid) {
+function dbRefreshAllCaches(pb, uid) {
   var promises = __tables.map(function(entry) {
     var t = entry.desc;
-    var query = sb.from(t.tableName).select('*').eq('user_id', uid);
-    if (t.orderBy) query = query.order(t.orderBy);
-    return query.then(function(res) {
-      if (!res.error) {
-        var data = typeof t.transform === 'function' ? t.transform(res.data) : res.data;
+    var filter = 'user_id="' + pbEscape(uid) + '"';
+    var sort = '';
+    if (t.orderBy) {
+      // Supabase 的 orderBy 默认升序（如 'created_at'）；PocketBase 用 '+field' / '-field'
+      sort = t.orderBy;
+    }
+    return pb.collection(t.tableName).getFullList({ filter: filter, sort: sort, requestKey: null })
+      .then(function(records) {
+        var data = typeof t.transform === 'function' ? t.transform(records) : records;
         dbCacheSave(uid, t.cacheKey, data);
-      }
-    }).catch(function() { /* single table fail shouldn't block others */ });
+      })
+      .catch(function() { /* single table fail shouldn't block others */ });
   });
   return Promise.all(promises);
 }
@@ -123,10 +128,10 @@ function dbRefreshAllCaches(sb, uid) {
 // 表驱动队列重放
 // ================================================================
 
-function dbReplayAction(sb, uid, action) {
+function dbReplayAction(pb, uid, action) {
   var mod = __modules[action._module];
   if (mod && mod.actions && typeof mod.actions[action.type] === 'function') {
-    return mod.actions[action.type](sb, uid, action);
+    return mod.actions[action.type](pb, uid, action);
   }
 }
 
@@ -143,7 +148,7 @@ function dbRenderView(viewName) {
   }
 }
 
-function dbMigrateAll(data, sb, uid) {
+function dbMigrateAll(data, pb, uid) {
   var results = {};
   var seen = {};
 
@@ -160,7 +165,7 @@ function dbMigrateAll(data, sb, uid) {
     var modId = legacyMap[key];
     if (modId && __modules[modId] && typeof __modules[modId].migrate === 'function') {
       pending.push((function(mid, k) {
-        return __modules[mid].migrate(data, sb, uid).then(function(r) {
+        return __modules[mid].migrate(data, pb, uid).then(function(r) {
           if (r) { results[mid] = (results[mid] || 0) + (r.inserted || 0); }
         });
       })(modId, key));
@@ -172,7 +177,7 @@ function dbMigrateAll(data, sb, uid) {
   for (modId in __modules) {
     if (data[modId] && __modules[modId].migrate && !seen[modId]) {
       pending.push((function(mid) {
-        return __modules[mid].migrate(data[mid], sb, uid).then(function(r) {
+        return __modules[mid].migrate(data[mid], pb, uid).then(function(r) {
           if (r) { results[mid] = (results[mid] || 0) + (r.inserted || 0); }
         });
       })(modId));

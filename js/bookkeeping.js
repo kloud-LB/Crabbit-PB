@@ -68,16 +68,16 @@ var bkSwipeStartY = 0;
 async function loadBkRecordsOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('bookkeeping_records').select('*').eq('user_id', uid).order('date', { ascending: false }).order('created_at', { ascending: false });
-      if (!res.error) {
-        bkRecords = res.data.map(function(r) {
+      var res = await pb.collection('bookkeeping_records').eq('user_id', uid).order('date', { ascending: false }).order('created_at', { ascending: false });
+      
+        bkRecords = res.map(function(r) {
           return { id: r.id.toString(), type: r.type, amount: parseFloat(r.amount), category: r.category, note: r.note || '', date: r.date, createdAt: new Date(r.created_at).getTime() };
         });
         if (uid) dbCacheSave(uid, 'checkin_cache_bk_records', bkRecords);
         return;
-      }
+    }
     } catch(e) {}
   }
   if (authUser) {
@@ -90,7 +90,7 @@ async function loadBkRecordsOnline() {
 async function saveBkRecordToServer(record) {
   if (isOnline) {
     try {
-      await getSupabase().from('bookkeeping_records').upsert({ id: parseInt(record.id), user_id: authUser.id, type: record.type, amount: record.amount, category: record.category, note: record.note || '', date: record.date, created_at: new Date(record.createdAt).toISOString() });
+      await pbUpsert('bookkeeping_records', { id: parseInt(record.id), user_id: authUser.id, type: record.type, amount: record.amount, category: record.category, note: record.note || '', date: record.date, created_at: new Date(record.createdAt).toISOString() }, 'id="' + pbEscape(String(parseInt(record.id))) + '"');
     } catch(e) {
       queuePush({ _module: 'bookkeeping', type: 'upsertRecord', id: parseInt(record.id), type2: record.type, amount: record.amount, category: record.category, note: record.note, date: record.date, createdAt: record.createdAt });
     }
@@ -102,7 +102,7 @@ async function saveBkRecordToServer(record) {
 
 async function deleteBkRecordFromServer(recordId) {
   if (isOnline) {
-    try { await getSupabase().from('bookkeeping_records').delete().eq('id', parseInt(recordId)).eq('user_id', authUser.id); }
+    try { await getPB().collection('bookkeeping_records').delete(String(parseInt(recordId))).eq('user_id', authUser.id); }
     catch(e) { queuePush({ _module: 'bookkeeping', type: 'deleteRecord', id: parseInt(recordId) }); }
   } else { queuePush({ _module: 'bookkeeping', type: 'deleteRecord', id: parseInt(recordId) }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bk_records', bkRecords);
@@ -498,7 +498,6 @@ function getPeriodDateRange(periodType, periodValue) {
     var y3 = parseInt(periodValue), months = [];
     for (var k = 1; k <= 12; k++) months.push(y3 + '-' + String(k).padStart(2,'0'));
     return months;
-  }
 }
 
 function getPeriodLabels(periodType, dates) {
@@ -635,8 +634,8 @@ DataModule({
     }
   }],
   actions: {
-    upsertRecord: async function(sb, uid, a) { await sb.from('bookkeeping_records').upsert({ id: a.id, user_id: uid, type: a.type2, amount: a.amount, category: a.category, note: a.note || '', date: a.date, created_at: new Date(a.createdAt).toISOString() }); },
-    deleteRecord: async function(sb, uid, a) { await sb.from('bookkeeping_records').delete().eq('id', a.id).eq('user_id', uid); }
+    upsertRecord: async function(pb, uid, a) { pbUpsert('bookkeeping_records', { id: a.id, user_id: uid, type: a.type2, amount: a.amount, category: a.category, note: a.note || '', date: a.date, created_at: new Date(a.createdAt).toISOString() }, 'id="' + pbEscape(String(a.id)) + '"'); },
+    deleteRecord: async function(pb, uid, a) { await pb.collection('bookkeeping_records').delete(String(a.id)); }
   },
   init: function() { bkRecords = bkState.records; renderBkAddView(); },
   render: function(viewName) {
@@ -694,8 +693,8 @@ DataModule({
     var records = data.bookkeeping, inserted = 0, errors = 0;
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
-      var res = await sb.from('bookkeeping_records').upsert({ id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type, amount: r.amount, category: r.category, note: r.note || '', date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString() });
-      if (res.error) errors++; else inserted++;
+      var res = pbUpsert('bookkeeping_records', { id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type, amount: r.amount, category: r.category, note: r.note || '', date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString() }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      inserted++;
     }
     return { inserted: inserted, errors: errors };
   },

@@ -54,8 +54,8 @@ async function syncOfflineQueue() {
   try {
     var q = queueGet();
     if (q.length === 0) { syncInProgress = false; return; }
-    var sb = getSupabase();
-    var uid = (await sb.auth.getUser()).data.user?.id;
+    var pb = getPB();
+    var uid = pb.authStore.model ? pb.authStore.model.id : null;
     if (!uid) { syncInProgress = false; return; }
 
     // Filter out actions that may cause conflicts
@@ -63,15 +63,15 @@ async function syncOfflineQueue() {
     for (var i = 0; i < q.length; i++) {
       var action = q[i];
       try {
-        await dbReplayAction(sb, uid, action);
+        await dbReplayAction(pb, uid, action);
       } catch(e) {
         remaining.push(action);
       }
     }
     queueSet(remaining);
 
-    // Refresh all caches from Supabase (parallel, table-driven)
-    await dbRefreshAllCaches(sb, uid);
+    // Refresh all caches from PocketBase (parallel, table-driven)
+    await dbRefreshAllCaches(pb, uid);
 
   } catch(e) {
     /* re-sync later */

@@ -1,11 +1,11 @@
 /* ================================================================
-   auth.js — Supabase 用户认证 + 用户资料（昵称 + 头像）
+   auth.js — PocketBase 用户认证 + 用户资料（昵称 + 头像）
    ================================================================ */
 
 var authUser = null;
 var userProfile = { nickname: '', avatar: '👤' };
 
-const AVATAR_EMOJIS = [
+var AVATAR_EMOJIS = [
   '👤', '😊', '😎', '🤓', '👨', '👩', '🧑', '👻',
   '🐱', '🐶', '🦊', '🐼', '🐨', '🦁', '🐯', '🐸',
   '🦄', '🐙', '🌈', '⭐', '🔥', '💎', '🎯', '🚀',
@@ -24,14 +24,14 @@ async function loadUserProfile(uid) {
   // Fetch from server
   if (isOnline) {
     try {
-      var sb = getSupabase();
-      var res = await sb.from('user_profiles').select('*').eq('user_id', uid).maybeSingle();
-      if (!res.error && res.data) {
-        userProfile = { nickname: res.data.nickname, avatar: res.data.avatar || '👤' };
-        dbCacheSave(uid, 'checkin_cache_profile', userProfile);
-        updateAvatarBtn();
-      }
-    } catch(e) { /* use defaults */ }
+      var pb = getPB();
+      var record = await pb.collection('user_profiles').getFirstListItem('user_id="' + pbEscape(uid) + '"');
+      userProfile = { nickname: record.nickname, avatar: record.avatar || '👤' };
+      dbCacheSave(uid, 'checkin_cache_profile', userProfile);
+      updateAvatarBtn();
+    } catch(e) {
+      if (e.status !== 404) { /* use defaults */ }
+    }
   }
 }
 
@@ -41,12 +41,12 @@ async function saveUserProfile() {
   dbCacheSave(uid, 'checkin_cache_profile', userProfile);
   if (isOnline) {
     try {
-      await getSupabase().from('user_profiles').upsert({
+      await pbUpsert('user_profiles', {
         user_id: uid,
         nickname: userProfile.nickname,
         avatar: userProfile.avatar,
         updated_at: new Date().toISOString()
-      });
+      }, 'user_id="' + pbEscape(uid) + '"');
     } catch(e) { /* offline queue */ }
   }
 }
@@ -65,11 +65,7 @@ function updateAvatarBtn() {
 }
 
 function toggleUserPanel() {
-  // Auth bypassed — always show user panel (guest mode)
-  if (!authUser) {
-    showToast('本地模式，无需登录');
-    return;
-  }
+  if (!authUser) return;
   var overlay = document.getElementById('userPanelOverlay');
   if (!overlay) return;
   if (overlay.classList.contains('show')) {
@@ -134,24 +130,29 @@ function closeNicknameEdit() {
   document.getElementById('nicknameEditOverlay').classList.remove('show');
 }
 
-// ---- Session Management ----
+// ---- Session Management (PocketBase) ----
 async function initAuth() {
-  try {
-    var sb = getSupabase();
-    var resp = await sb.auth.getUser();
-    authUser = resp.data.user || null;
-  } catch(e) {
-    authUser = null;
+  var pb;
+  try { pb = getPB(); } catch(e) { authUser = null; showAuthUI(); return false; }
+
+  // Check if already authenticated via persisted auth store
+  if (pb.authStore.isValid && pb.authStore.model) {
+    authUser = pb.authStore.model;
+    document.body.classList.remove('is-guest');
+    document.body.classList.add('is-authed');
+    return true;
   }
+
   // Listen for auth state changes
-  getSupabase().auth.onAuthStateChange(function(event, session) {
-    authUser = session ? session.user : null;
-    if (authUser) {
+  pb.authStore.onChange(function(token, model) {
+    if (model) {
+      authUser = model;
       document.body.classList.remove('is-guest');
       document.body.classList.add('is-authed');
       hideAuthUI();
       onUserReady();
     } else {
+      authUser = null;
       document.body.classList.add('is-guest');
       document.body.classList.remove('is-authed');
       userProfile = { nickname: '', avatar: '👤' };
@@ -159,17 +160,12 @@ async function initAuth() {
       showAuthUI();
     }
   });
-  // Restore session
-  if (authUser) {
-    document.body.classList.remove('is-guest');
-    document.body.classList.add('is-authed');
-    hideAuthUI();
-    return true;
-  } else {
-    document.body.classList.add('is-guest');
-    showAuthUI();
-    return false;
-  }
+
+  // No valid session
+  authUser = null;
+  document.body.classList.add('is-guest');
+  showAuthUI();
+  return false;
 }
 
 // ---- Auth UI ----
@@ -188,7 +184,7 @@ function getAuthHTML() {
       '</div>' +
       '<div class="form-group">' +
         '<label class="form-label">密码</label>' +
-        '<input class="form-input" id="loginPassword" type="password" placeholder="至少6位" autocomplete="current-password">' +
+        '<input class="form-input" id="loginPassword" type="password" placeholder="至少8位" autocomplete="current-password">' +
       '</div>' +
       '<div class="auth-err" id="loginError"></div>' +
       '<button class="form-submit" id="authSignInBtn">登录</button>' +
@@ -196,7 +192,7 @@ function getAuthHTML() {
         '还没有账号？<a role="button" id="goRegister" style="color:#6b7db3;cursor:pointer;font-weight:600">点击注册</a>' +
       '</p>' +
       '<p style="text-align:center;font-size:0.65rem;color:var(--text-tertiary);margin-top:12px">' +
-        '你的数据仅属于你，通过 Row Level Security 隔离' +
+        '你的数据仅属于你，通过 PocketBase 后端安全存储' +
       '</p>' +
     '</div>' +
     // ====== Register Card ======
@@ -220,7 +216,7 @@ function getAuthHTML() {
       '</div>' +
       '<div class="form-group">' +
         '<label class="form-label">密码</label>' +
-        '<input class="form-input" id="regPassword" type="password" placeholder="至少6位" autocomplete="new-password">' +
+        '<input class="form-input" id="regPassword" type="password" placeholder="至少8位" autocomplete="new-password">' +
       '</div>' +
       '<div class="auth-err" id="regError"></div>' +
       '<button class="form-submit" id="authSignUpBtn">注册新账号</button>' +
@@ -228,7 +224,7 @@ function getAuthHTML() {
         '已有账号？<a role="button" id="goLogin" style="color:#6b7db3;cursor:pointer;font-weight:600">点击登录</a>' +
       '</p>' +
       '<p style="text-align:center;font-size:0.65rem;color:var(--text-tertiary);margin-top:12px">' +
-        '你的数据仅属于你，通过 Row Level Security 隔离' +
+        '你的数据仅属于你，通过 PocketBase 后端安全存储' +
       '</p>' +
     '</div>' +
   '</div>';
@@ -240,7 +236,6 @@ function showAuthUI() {
   var existing = document.getElementById('authContainer');
   if (existing) {
     existing.style.display = '';
-    // Always reset to login card
     switchAuthCard('login');
   } else {
     var div = document.createElement('div');
@@ -269,7 +264,6 @@ function switchAuthCard(mode) {
   var re = document.getElementById('regError'); if (re) { re.textContent = ''; re.style.display = 'none'; }
 
   if (mode === 'login') {
-    // Copy email from register → login if register has a value
     var regEmail = document.getElementById('regEmail');
     var loginEmail = document.getElementById('loginEmail');
     if (regEmail && loginEmail && regEmail.value.trim()) {
@@ -278,7 +272,6 @@ function switchAuthCard(mode) {
     loginCard.style.display = '';
     regCard.style.display = 'none';
   } else {
-    // Copy email from login → register if login has a value
     var lgEmail = document.getElementById('loginEmail');
     var rgEmail = document.getElementById('regEmail');
     if (lgEmail && rgEmail && lgEmail.value.trim()) {
@@ -334,7 +327,7 @@ function bindAuthEvents() {
   document.getElementById('goRegister').onclick = function() { switchAuthCard('register'); };
   document.getElementById('goLogin').onclick = function() { switchAuthCard('login'); };
 
-  // ---- Helper for login errors ----
+  // ---- Helper for errors ----
   function showLoginErr(msg) {
     var el = document.getElementById('loginError');
     el.textContent = msg; el.style.display = '';
@@ -344,27 +337,24 @@ function bindAuthEvents() {
     el.textContent = msg; el.style.display = '';
   }
 
-  // ---- Sign In ----
+  // ---- Sign In (PocketBase) ----
   document.getElementById('authSignInBtn').onclick = async function() {
     var btn = document.getElementById('authSignInBtn');
     showLoginErr('');
     var email = document.getElementById('loginEmail').value.trim();
     var pass = document.getElementById('loginPassword').value;
     if (!email || !pass) { showLoginErr('请填写邮箱和密码'); return; }
-    if (pass.length < 6) { showLoginErr('密码至少6位'); return; }
+    if (pass.length < 8) { showLoginErr('密码至少8位'); return; }
     showAuthLoading(btn);
     try {
-      var resp = await withTimeout(getSupabase().auth.signInWithPassword({ email: email, password: pass }), LOGIN_TIMEOUT_MS);
-      if (resp.error) {
-        showLoginErr('邮箱或密码错误');
-        hideAuthLoading(btn, '登录');
-        return;
-      }
-      // Success → onAuthStateChange fires → hideAuthUI + onUserReady
-      // Keep loading state until redirect completes
+      var pb = getPB();
+      var resp = await withTimeout(pb.collection('users').authWithPassword(email, pass), LOGIN_TIMEOUT_MS);
+      // Success — authStore.onChange fires → onUserReady
     } catch(e) {
       if (e.message === 'TIMEOUT') {
         showLoginErr('登录超时，请检查网络后重试');
+      } else if (e.status === 400) {
+        showLoginErr('邮箱或密码错误');
       } else {
         showLoginErr('登录失败，请检查网络');
       }
@@ -372,7 +362,7 @@ function bindAuthEvents() {
     }
   };
 
-  // ---- Sign Up ----
+  // ---- Sign Up (PocketBase) ----
   document.getElementById('authSignUpBtn').onclick = async function() {
     var btn = document.getElementById('authSignUpBtn');
     showRegErr('');
@@ -381,53 +371,49 @@ function bindAuthEvents() {
     var pass = document.getElementById('regPassword').value;
     if (!nickname) { showRegErr('请填写昵称'); return; }
     if (!email || !pass) { showRegErr('请填写邮箱和密码'); return; }
-    if (pass.length < 6) { showRegErr('密码至少6位'); return; }
+    if (pass.length < 8) { showRegErr('密码至少8位'); return; }
     showAuthLoading(btn);
     try {
-      var resp = await withTimeout(getSupabase().auth.signUp({ email: email, password: pass }), LOGIN_TIMEOUT_MS);
-
-      // Error: email already registered
-      if (resp.error) {
-        if (resp.error.message && resp.error.message.toLowerCase().indexOf('already') !== -1) {
-          showRegErr('该邮箱已注册，请直接登录');
-          hideAuthLoading(btn, '注册新账号');
-          setTimeout(function() { switchAuthCard('login'); }, 800);
-        } else {
-          showRegErr(resp.error.message);
-          hideAuthLoading(btn, '注册新账号');
-        }
-        return;
-      }
+      var pb = getPB();
+      var userData = {
+        email: email,
+        password: pass,
+        passwordConfirm: pass
+      };
+      var resp = await withTimeout(pb.collection('users').create(userData), LOGIN_TIMEOUT_MS);
 
       // Write user profile
-      var uid = resp.data.user ? resp.data.user.id : null;
-      if (uid) {
-        userProfile = { nickname: nickname, avatar: _authAvatarSelected };
-        try {
-          await getSupabase().from('user_profiles').upsert({
-            user_id: uid, nickname: nickname, avatar: _authAvatarSelected,
-            updated_at: new Date().toISOString()
-          });
-          dbCacheSave(uid, 'checkin_cache_profile', userProfile);
-        } catch(e) { /* profile write failed, non-critical */ }
-        updateAvatarBtn();
-      }
+      var uid = resp.id;
+      userProfile = { nickname: nickname, avatar: _authAvatarSelected };
+      try {
+        await pbUpsert('user_profiles', {
+          user_id: uid,
+          nickname: nickname,
+          avatar: _authAvatarSelected,
+          updated_at: new Date().toISOString()
+        }, 'user_id="' + pbEscape(uid) + '"');
+        dbCacheSave(uid, 'checkin_cache_profile', userProfile);
+      } catch(e) { /* profile write failed, non-critical */ }
+      updateAvatarBtn();
 
-      // Auto-login or email confirmation
-      if (resp.data.session) {
-        // Email confirm disabled — onAuthStateChange fires automatically, no action needed
-        // Keep loading state until redirect completes
-      } else {
-        // Email confirm enabled — session is null, user must confirm first
-        showRegErr('注册成功！请查收确认邮件后登录');
+      // Auto-login after registration
+      try {
+        await pb.collection('users').authWithPassword(email, pass);
+        // authStore.onChange fires → onUserReady
+      } catch(loginErr) {
+        showRegErr('注册成功！请手动登录');
         hideAuthLoading(btn, '注册新账号');
         setTimeout(function() { switchAuthCard('login'); }, 1500);
       }
     } catch(e) {
       if (e.message === 'TIMEOUT') {
         showRegErr('注册超时，请检查网络后重试');
+      } else if (e.status === 400 && e.data && e.data.email) {
+        showRegErr('该邮箱已注册，请直接登录');
+        hideAuthLoading(btn, '注册新账号');
+        setTimeout(function() { switchAuthCard('login'); }, 800);
       } else {
-        showRegErr('注册失败，请检查网络');
+        showRegErr('注册失败，请检查输入信息');
       }
       hideAuthLoading(btn, '注册新账号');
     }
@@ -460,7 +446,8 @@ function bindUserPanelEvents() {
 
   document.getElementById('userPanelLogout').onclick = function() {
     closeUserPanel();
-    showToast('本地模式，无需登出');
+    signOutUser();
+    showToast('已退出登录');
   };
 
   document.getElementById('userPanelExport').onclick = function() {
@@ -487,7 +474,7 @@ function bindUserPanelEvents() {
 
 async function signOutUser() {
   try {
-    await getSupabase().auth.signOut();
+    getPB().authStore.clear();
     authUser = null;
   } catch(e) { /* ignore */ }
 }

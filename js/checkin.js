@@ -12,14 +12,12 @@
 async function loadTasksOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('checkin_tasks').select('*').eq('user_id', uid).order('created_at');
-      if (!res.error) {
-        tasks = res.data.map(function(r) { return { id: r.id.toString(), name: r.name, targetCount: r.target_count, color: r.color, createdAt: new Date(r.created_at).getTime() }; });
-        if (uid) dbCacheSave(uid, 'checkin_cache_tasks', tasks);
-        return;
-      }
+      var records = await pb.collection('checkin_tasks').getFullList({filter: 'user_id="' + pbEscape(uid) + '"', sort: '+created_at'});
+      tasks = records.map(function(r) { return { id: r.id.toString(), name: r.name, targetCount: r.target_count, color: r.color, createdAt: new Date(r.created_at).getTime() }; });
+      if (uid) dbCacheSave(uid, 'checkin_cache_tasks', tasks);
+      return;
     } catch(e) { /* fallback */ }
   }
   // Offline: use cache
@@ -33,9 +31,9 @@ async function loadTasksOnline() {
 async function saveTaskToServer(task) {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      await sb.from('checkin_tasks').upsert({ id: parseInt(task.id), user_id: uid, name: task.name, target_count: task.targetCount, color: task.color, created_at: new Date(task.createdAt).toISOString() });
+      await pbUpsert('checkin_tasks', { id: parseInt(task.id), user_id: uid, name: task.name, target_count: task.targetCount, color: task.color, created_at: new Date(task.createdAt).toISOString() }, 'id="' + pbEscape(task.id) + '"');
     } catch(e) { queuePush({ _module: 'checkin', type: 'updateTask', id: parseInt(task.id), name: task.name, targetCount: task.targetCount, color: task.color }); }
   } else {
     queuePush({ _module: 'checkin', type: 'updateTask', id: parseInt(task.id), name: task.name, targetCount: task.targetCount, color: task.color });
@@ -45,7 +43,7 @@ async function saveTaskToServer(task) {
 
 async function deleteTaskFromServer(taskId) {
   if (isOnline) {
-    try { await getSupabase().from('checkin_tasks').delete().eq('id', parseInt(taskId)).eq('user_id', authUser.id); }
+    try { await getPB().collection('checkin_tasks').delete(String(parseInt(taskId))); }
     catch(e) { queuePush({ _module: 'checkin', type: 'deleteTask', id: parseInt(taskId) }); }
   } else { queuePush({ _module: 'checkin', type: 'deleteTask', id: parseInt(taskId) }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_tasks', tasks);
@@ -54,18 +52,16 @@ async function deleteTaskFromServer(taskId) {
 async function loadHistoryOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('checkin_history').select('*').eq('user_id', uid);
-      if (!res.error) {
-        history = {};
-        res.data.forEach(function(r) {
-          if (!history[r.date]) history[r.date] = {};
-          history[r.date][r.task_id] = { count: r.count, completedAt: new Date(r.completed_at).getTime() };
-        });
-        if (uid) dbCacheSave(uid, 'checkin_cache_history', history);
-        return;
-      }
+      var records = await pb.collection('checkin_history').getFullList({filter: 'user_id="' + pbEscape(uid) + '"'});
+      history = {};
+      records.forEach(function(r) {
+        if (!history[r.date]) history[r.date] = {};
+        history[r.date][r.task_id] = { count: r.count, completedAt: new Date(r.completed_at).getTime() };
+      });
+      if (uid) dbCacheSave(uid, 'checkin_cache_history', history);
+      return;
     } catch(e) { /* fallback */ }
   }
   if (authUser && typeof cacheGetHistory === 'function') {
@@ -78,7 +74,8 @@ async function loadHistoryOnline() {
 async function saveCheckinEntry(taskId, dateStr, count, ts) {
   if (isOnline) {
     try {
-      await getSupabase().from('checkin_history').upsert({ user_id: authUser.id, task_id: parseInt(taskId), date: dateStr, count: count, completed_at: new Date(ts).toISOString() }, { onConflict: 'user_id,task_id,date' });
+      var filter = 'user_id="' + pbEscape(authUser.id) + '" && task_id="' + pbEscape(String(parseInt(taskId))) + '" && date="' + pbEscape(dateStr) + '"';
+      await pbUpsert('checkin_history', { user_id: authUser.id, task_id: parseInt(taskId), date: dateStr, count: count, completed_at: new Date(ts).toISOString() }, filter);
     } catch(e) { queuePush({ _module: 'checkin', type: 'checkin', taskId: parseInt(taskId), date: dateStr, count: count, timestamp: ts }); }
   } else {
     queuePush({ _module: 'checkin', type: 'checkin', taskId: parseInt(taskId), date: dateStr, count: count, timestamp: ts });
@@ -88,8 +85,13 @@ async function saveCheckinEntry(taskId, dateStr, count, ts) {
 
 async function deleteCheckinEntry(taskId, dateStr) {
   if (isOnline) {
-    try { await getSupabase().from('checkin_history').delete().eq('user_id', authUser.id).eq('task_id', parseInt(taskId)).eq('date', dateStr); }
-    catch(e) { queuePush({ _module: 'checkin', type: 'undoCheckin', taskId: parseInt(taskId), date: dateStr }); }
+    try {
+      try {
+        var _filter = 'user_id="' + pbEscape(authUser.id) + '" && task_id="' + pbEscape(String(parseInt(taskId))) + '" && date="' + pbEscape(dateStr) + '"';
+        var _rec = await getPB().collection('checkin_history').getFirstListItem(_filter);
+        await getPB().collection('checkin_history').delete(_rec.id);
+      } catch(_e) { if (_e.status !== 404) throw _e; }
+    } catch(e) { queuePush({ _module: 'checkin', type: 'undoCheckin', taskId: parseInt(taskId), date: dateStr }); }
   } else { queuePush({ _module: 'checkin', type: 'undoCheckin', taskId: parseInt(taskId), date: dateStr }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_history', history);
 }
@@ -360,30 +362,34 @@ DataModule({
     }
   ],
   actions: {
-    checkin: async function(sb, uid, a) {
-      await sb.from('checkin_history').upsert({
+    checkin: async function(pb, uid, a) {
+      var f = 'user_id="' + pbEscape(uid) + '" && task_id="' + pbEscape(String(a.taskId)) + '" && date="' + pbEscape(a.date) + '"';
+      await pbUpsert('checkin_history', {
         user_id: uid, task_id: a.taskId, date: a.date,
         count: a.count, completed_at: new Date(a.timestamp).toISOString()
-      }, { onConflict: 'user_id,task_id,date' });
+      }, f);
     },
-    createTask: async function(sb, uid, a) {
-      await sb.from('checkin_tasks').upsert({
+    createTask: async function(pb, uid, a) {
+      await pbUpsert('checkin_tasks', {
         id: a.id, user_id: uid, name: a.name,
         target_count: a.targetCount, color: a.color,
         created_at: new Date(a.createdAt).toISOString()
+      }, 'id="' + pbEscape(String(a.id)) + '"');
+    },
+    updateTask: async function(pb, uid, a) {
+      await pb.collection('checkin_tasks').update(String(a.id), {
+        name: a.name, target_count: a.targetCount, color: a.color
       });
     },
-    updateTask: async function(sb, uid, a) {
-      await sb.from('checkin_tasks').update({
-        name: a.name, target_count: a.targetCount, color: a.color
-      }).eq('id', a.id).eq('user_id', uid);
+    deleteTask: async function(pb, uid, a) {
+      await pb.collection('checkin_tasks').delete(String(a.id));
     },
-    deleteTask: async function(sb, uid, a) {
-      await sb.from('checkin_tasks').delete().eq('id', a.id).eq('user_id', uid);
-    },
-    undoCheckin: async function(sb, uid, a) {
-      await sb.from('checkin_history').delete()
-        .eq('user_id', uid).eq('task_id', a.taskId).eq('date', a.date);
+    undoCheckin: async function(pb, uid, a) {
+      var f = 'user_id="' + pbEscape(uid) + '" && task_id="' + pbEscape(String(a.taskId)) + '" && date="' + pbEscape(a.date) + '"';
+      try {
+        var _r = await pb.collection('checkin_history').getFirstListItem(f);
+        await pb.collection('checkin_history').delete(_r.id);
+      } catch(_e) { if (_e.status !== 404) throw _e; }
     }
   },
   init: function() {
@@ -436,16 +442,19 @@ DataModule({
       if (fab) fab.style.display = '';
     }
   },
-  migrate: async function(data, sb, uid) {
+  migrate: async function(data, pb, uid) {
     var inserted = 0, errors = 0;
     if (data.tasks) for (var i = 0; i < data.tasks.length; i++) {
       var t = data.tasks[i];
-      var res = await sb.from('checkin_tasks').upsert({
-        id: parseInt(t.id) || (Date.now() + i), user_id: uid, name: t.name,
-        target_count: t.targetCount || 1, color: t.color || '#6b7db3',
-        created_at: new Date(t.createdAt || Date.now()).toISOString()
-      });
-      if (res.error) errors++; else inserted++;
+      var tid = parseInt(t.id) || (Date.now() + i);
+      try {
+        await pbUpsert('checkin_tasks', {
+          id: tid, user_id: uid, name: t.name,
+          target_count: t.targetCount || 1, color: t.color || '#6b7db3',
+          created_at: new Date(t.createdAt || Date.now()).toISOString()
+        }, 'id="' + pbEscape(String(tid)) + '"');
+        inserted++;
+      } catch(e) { errors++; }
     }
     if (data.history) {
       var dates = Object.keys(data.history);
@@ -454,11 +463,14 @@ DataModule({
         for (var tid in dayData) {
           if (!dayData.hasOwnProperty(tid)) continue;
           var h = dayData[tid];
-          var res = await sb.from('checkin_history').upsert({
-            user_id: uid, task_id: parseInt(tid), date: dates[d],
-            count: h.count || 1, completed_at: new Date(h.completedAt || Date.now()).toISOString()
-          }, { onConflict: 'user_id,task_id,date' });
-          if (res.error) errors++; else inserted++;
+          try {
+            var f = 'user_id="' + pbEscape(uid) + '" && task_id="' + pbEscape(String(parseInt(tid))) + '" && date="' + pbEscape(dates[d]) + '"';
+            await pbUpsert('checkin_history', {
+              user_id: uid, task_id: parseInt(tid), date: dates[d],
+              count: h.count || 1, completed_at: new Date(h.completedAt || Date.now()).toISOString()
+            }, f);
+            inserted++;
+          } catch(e) { errors++; }
         }
       }
     }

@@ -10,8 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 当前状态
 
-- **认证已绕过**：`app.js` `init()` 中注释掉了 `initAuth()` 调用，直接以访客身份进入。`authUser` 被设为虚拟对象 `{ id: 'guest_...', email: '' }`。用户面板退出按钮为 no-op。
-- **Supabase 云实例已失效**：`krvztfxtybxnlqauefhz.supabase.co` DNS 已不存在。数据全部走 localStorage。未来规划自托管迁移（见 SELF-HOSTING.md）。
+- **认证已启用**：`app.js` `init()` 调用 `initAuth()`，通过 PocketBase 进行真实用户认证。本地/访客模式已完全移除，必须登录才能使用。
+- **后端已迁移至 PocketBase**：`js/pocketbase-client.js` 替代了 `js/supabase-client.js`。PocketBase v0.39.7 本地运行在 `localhost:8090`，12 个 collection 全部配置了基于 `user_id` 的行级隔离规则。原 `supabase-client.js` 保留但不再加载。
 - **v3 Agent 联动已规划**：见 V3_ROADMAP.md 和 V3_INTERFACE_ANALYSIS.md，当前尚未实施。
 
 ## 架构概览
@@ -68,23 +68,25 @@ checkin / todo / bookkeeping / body / diet / sleep
 
 ### 脚本加载顺序（不可变）
 
-supabase SDK CDN → supabase-client → db → offline → auth → migrate → app → checkin → stats → todo → bookkeeping → body-measurement → diet → sleep
+PocketBase SDK CDN → pocketbase-client → db → offline → auth → migrate → app → checkin → stats → todo → bookkeeping → body-measurement → diet → sleep
 
 `db.js` 必须最先加载（定义 DataModule），`app.js` 必须在模块之后（调用 `bindModuleEvents()`）。
 
 ### localStorage 缓存规范
 
 - key 格式：`checkin_cache_<表名>`（如 `checkin_cache_tasks`）
-- 值格式：`{ _uid: 'guest_xxx', data: [...], _ts: 时间戳 }`
+- 值格式：`{ _uid: '<pocketbase_user_id>', data: [...], _ts: 时间戳 }`
 - 离线队列 key：`checkin_offline_queue`
 - 主题 key：`checkin_theme`
 - 用户资料缓存：`checkin_cache_profile`、`checkin_cache_diet_settings`
 
 ## 注意事项
 
-- **Supabase 凭证**在 [js/supabase-client.js](js/supabase-client.js) 中硬编码，当前云实例已失效
-- **Live Server 端口 5500**：若恢复 Supabase Auth，Site URL 需配置为 `http://localhost:5500`
-- **Supabase URL 不能带 `/rest/v1/`**：SDK 内部自动拼接
+- **PocketBase 后端**：需在 `~/Crabbit-V2/pb/` 目录运行 `./pocketbase serve`（默认 `localhost:8090`）。首次使用需在 Admin UI (`http://localhost:8090/_/`) 创建管理员账号并导入 12 个 collection 的 schema
+- **后端URL 配置**：[js/pocketbase-client.js](js/pocketbase-client.js) 中的 `PB_URL`，当前为 `http://localhost:8090`
+- **Live Server 端口 5500**：前端通过 VS Code Live Server 在端口 5500 运行
+- **pbUpsert 辅助函数**：PocketBase 无原生 upsert，`pocketbase-client.js` 中实现了 `pbUpsert(collection, data, filter)`，先查后改
+- **pbEscape 辅助函数**：转义 PocketBase filter 字符串中的双引号
 - **所有模块遵循相同 DataModule 模式**：新增功能模块时复制已有模块的结构即可
 - **diet.js 为最大模块**（约 700 行），内含三个子 tab（eating/drinking/bathroom）各自独立的渲染逻辑
 - **CSS 为单文件** `css/app.css`（约 1300 行），按模块用注释分隔
@@ -98,6 +100,6 @@ supabase SDK CDN → supabase-client → db → offline → auth → migrate →
 | CHANGELOG.md | 版本更新日志 |
 | PROJECT_GUIDE.md | 新人入门完整指南（文件逐一介绍 + 运行时流程 + 设计模式） |
 | PITFALLS.md | 开发中踩过的 12 个坑 |
-| SELF-HOSTING.md | Supabase 自托管部署手册 |
 | V3_ROADMAP.md | V3 Agent 智能助手规划 |
 | V3_INTERFACE_ANALYSIS.md | V3 接口约束分析 |
+| pb/POCKETBASE_SETUP.md | PocketBase 本地部署说明（已替代 Supabase） |

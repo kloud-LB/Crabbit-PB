@@ -307,15 +307,15 @@ DataModule({
     }
   }],
   actions: {
-    upsertRecord: async function(sb, uid, a) {
-      await sb.from('sleep_records').upsert({
+    upsertRecord: async function(pb, uid, a) {
+      pbUpsert('sleep_records', {
         id: parseInt(a.id), user_id: uid, type: a.type, sleep_time: a.sleep_time,
         wake_time: a.wake_time, duration_min: a.duration_min, date: a.date,
         rating: a.rating, quality: a.quality, created_at: new Date(a.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(parseInt(a.id))) + '"');
     },
-    deleteRecord: async function(sb, uid, a) {
-      await sb.from('sleep_records').delete().eq('id', a.id).eq('user_id', uid);
+    deleteRecord: async function(pb, uid, a) {
+      await pb.collection('sleep_records').delete(String(a.id));
     }
   },
   init: function() {
@@ -383,14 +383,14 @@ DataModule({
     var items = data.sleepRecords, inserted = 0, errors = 0;
     for (var i = 0; i < items.length; i++) {
       var r = items[i];
-      var res = await sb.from('sleep_records').upsert({
+      var res = pbUpsert('sleep_records', {
         id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type || 'main',
         sleep_time: r.sleep_time, wake_time: r.wake_time,
         duration_min: r.duration_min || 480, date: r.date || todayStr(),
         rating: r.rating, quality: r.quality,
         created_at: new Date(r.createdAt || Date.now()).toISOString()
-      });
-      if (res.error) errors++; else inserted++;
+      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      inserted++;
     }
     return { inserted: inserted, errors: errors };
   },

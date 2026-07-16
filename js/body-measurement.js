@@ -22,16 +22,14 @@ function getBmTypeMeta(typeId) {
 async function loadBmRecordsOnline() {
   if (isOnline) {
     try {
-      var sb = getSupabase();
+      var pb = getPB();
       var uid = authUser.id;
-      var res = await sb.from('body_measurements').select('*').eq('user_id', uid).order('date', { ascending: false });
-      if (!res.error) {
-        bmRecords = res.data.map(function(r) {
-          return { id: r.id.toString(), type: r.type, value: parseFloat(r.value), date: r.date, createdAt: new Date(r.created_at).getTime() };
-        });
-        if (uid) dbCacheSave(uid, 'checkin_cache_bm_records', bmRecords);
-        return;
-      }
+      var records = await pb.collection('body_measurements').getFullList({filter: 'user_id="' + pbEscape(uid) + '"', sort: '-date'});
+      bmRecords = records.map(function(r) {
+        return { id: r.id.toString(), type: r.type, value: parseFloat(r.value), date: r.date, createdAt: new Date(r.created_at).getTime() };
+      });
+      if (uid) dbCacheSave(uid, 'checkin_cache_bm_records', bmRecords);
+      return;
     } catch(e) {}
   }
   if (authUser) {
@@ -44,10 +42,10 @@ async function loadBmRecordsOnline() {
 async function saveBmRecordToServer(record) {
   if (isOnline) {
     try {
-      await getSupabase().from('body_measurements').upsert({
+      await pbUpsert('body_measurements', {
         id: parseInt(record.id), user_id: authUser.id, type: record.type,
         value: record.value, date: record.date, created_at: new Date(record.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(parseInt(record.id))) + '"');
     } catch(e) {
       queuePush({ _module: 'bodyMeasurement', type: 'upsertRecord', id: parseInt(record.id), type2: record.type, value: record.value, date: record.date, createdAt: record.createdAt });
     }
@@ -59,7 +57,7 @@ async function saveBmRecordToServer(record) {
 
 async function deleteBmRecordFromServer(recordId) {
   if (isOnline) {
-    try { await getSupabase().from('body_measurements').delete().eq('id', parseInt(recordId)).eq('user_id', authUser.id); }
+    try { await getPB().collection('body_measurements').delete(String(parseInt(recordId))).eq('user_id', authUser.id); }
     catch(e) { queuePush({ _module: 'bodyMeasurement', type: 'deleteRecord', id: parseInt(recordId) }); }
   } else { queuePush({ _module: 'bodyMeasurement', type: 'deleteRecord', id: parseInt(recordId) }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bm_records', bmRecords);
@@ -259,14 +257,14 @@ DataModule({
     }
   }],
   actions: {
-    upsertRecord: async function(sb, uid, a) {
-      await sb.from('body_measurements').upsert({
+    upsertRecord: async function(pb, uid, a) {
+      pbUpsert('body_measurements', {
         id: a.id, user_id: uid, type: a.type2, value: a.value,
         date: a.date, created_at: new Date(a.createdAt).toISOString()
-      });
+      }, 'id="' + pbEscape(String(a.id)) + '"');
     },
-    deleteRecord: async function(sb, uid, a) {
-      await sb.from('body_measurements').delete().eq('id', a.id).eq('user_id', uid);
+    deleteRecord: async function(pb, uid, a) {
+      await pb.collection('body_measurements').delete(String(a.id));
     }
   },
   init: function() {
@@ -309,12 +307,12 @@ DataModule({
     var inserted = 0, errors = 0;
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
-      var res = await sb.from('body_measurements').upsert({
+      var res = pbUpsert('body_measurements', {
         id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type,
         value: r.value, date: r.date || todayStr(),
         created_at: new Date(r.createdAt || Date.now()).toISOString()
-      });
-      if (res.error) errors++; else inserted++;
+      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      inserted++;
     }
     return { inserted: inserted, errors: errors };
   },
