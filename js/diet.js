@@ -327,9 +327,19 @@ function renderDietAddRows() {
     '</div>';
   }).join('');
 
-  // Bind input events
+  // Bind input events with IME composition support
   container.querySelectorAll('.diet-add-input').forEach(function(input) {
+    var composing = false;
+    input.addEventListener('compositionstart', function() { composing = true; });
+    input.addEventListener('compositionend', function() {
+      composing = false;
+      // Final value read after composition
+      var idx = parseInt(this.dataset.idx);
+      var field = this.dataset.field;
+      if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
+    });
     input.addEventListener('input', function() {
+      if (composing) return; // skip during IME composition
       var idx = parseInt(this.dataset.idx);
       var field = this.dataset.field;
       if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
@@ -342,6 +352,56 @@ function renderDietAddRows() {
       renderDietAddRows();
     };
   });
+}
+
+// Render a single row and append to DOM (avoids destroying IME composition)
+function renderDietAddRow(i) {
+  var row = dietAddRows[i];
+  var container = document.getElementById('dietAddRows');
+  var html = '<div class="diet-add-row">' +
+    '<div class="diet-add-row-fields">' +
+      '<input class="diet-add-input diet-add-name" placeholder="食物名称" value="' + escHtml(row.name) + '" data-idx="' + i + '" data-field="name">' +
+      '<div class="diet-add-row-sub">' +
+        '<input class="diet-add-input diet-add-num" placeholder="克数" value="' + row.weight + '" data-idx="' + i + '" data-field="weight" inputmode="decimal" type="number" step="1">' +
+        '<input class="diet-add-input diet-add-num" placeholder="热量(千焦)" value="' + row.calories + '" data-idx="' + i + '" data-field="calories" inputmode="decimal" type="number" step="10">' +
+      '</div>' +
+      '<div class="diet-add-row-sub">' +
+        '<input class="diet-add-input diet-add-num" placeholder="碳水(g)" value="' + row.carbs + '" data-idx="' + i + '" data-field="carbs" inputmode="decimal" type="number" step="0.1">' +
+        '<input class="diet-add-input diet-add-num" placeholder="蛋白质(g)" value="' + row.protein + '" data-idx="' + i + '" data-field="protein" inputmode="decimal" type="number" step="0.1">' +
+        '<input class="diet-add-input diet-add-num" placeholder="脂肪(g)" value="' + row.fat + '" data-idx="' + i + '" data-field="fat" inputmode="decimal" type="number" step="0.1">' +
+      '</div>' +
+    '</div>' +
+    '<button class="diet-add-remove" data-idx="' + i + '"><i class="ri-close-line"></i></button>' +
+  '</div>';
+  container.insertAdjacentHTML('beforeend', html);
+
+  // Bind IME-safe input events for the new row
+  var newRow = container.lastElementChild;
+  newRow.querySelectorAll('.diet-add-input').forEach(function(input) {
+    var composing = false;
+    input.addEventListener('compositionstart', function() { composing = true; });
+    input.addEventListener('compositionend', function() {
+      composing = false;
+      var idx = parseInt(this.dataset.idx);
+      var field = this.dataset.field;
+      if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
+    });
+    input.addEventListener('input', function() {
+      if (composing) return;
+      var idx = parseInt(this.dataset.idx);
+      var field = this.dataset.field;
+      if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
+    });
+  });
+  // Bind remove button
+  var removeBtn = newRow.querySelector('.diet-add-remove');
+  if (removeBtn) {
+    removeBtn.onclick = function() {
+      var idx = parseInt(this.dataset.idx);
+      dietAddRows.splice(idx, 1);
+      renderDietAddRows();
+    };
+  }
 }
 
 function closeDietAdd() {
@@ -610,8 +670,7 @@ function loadBathroomRecords() {
 }
 
 async function saveBathroomRecord(record) {
-  bathroomRecords.push(record);
-  if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bathroom_records', bathroomRecords);
+  // Note: caller (saveBathroomRecordForm) already handles array push + cache save
   if (isOnline && authUser) {
     try {
       await pbUpsert('bathroom_records', {
@@ -939,8 +998,10 @@ DataModule({
         var field = input.dataset.field;
         if (dietAddRows[idx]) dietAddRows[idx][field] = input.value;
       });
+      var newIdx = dietAddRows.length;
       dietAddRows.push({ name: '', weight: '', calories: '', carbs: '', protein: '', fat: '' });
-      renderDietAddRows();
+      // Append single new row without destroying existing inputs (preserves IME)
+      renderDietAddRow(newIdx);
     };
 
     // Edit food
