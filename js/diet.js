@@ -90,18 +90,18 @@ async function saveFoodItemToServer(item) {
   if (isOnline) {
     try {
       await pbUpsert('food_items', {
-        id: parseInt(item.id), user_id: authUser.id, meal_type: item.mealType,
+        id: item.id, user_id: authUser.id, meal_type: item.mealType,
         name: item.name, weight: item.weight || 0, calories: item.calories,
         carbs: item.carbs || 0, protein: item.protein || 0, fat: item.fat || 0,
         date: item.date, created_at: new Date(item.createdAt).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(item.id))) + '"');
+      }, 'id="' + pbEscape(String(item.id)) + '"');
     } catch(e) {
-      queuePush({ _module: 'diet', type: 'upsertItem', id: parseInt(item.id), mealType: item.mealType,
+      queuePush({ _module: 'diet', type: 'upsertItem', id: item.id, mealType: item.mealType,
         name: item.name, weight: item.weight, calories: item.calories,
         carbs: item.carbs, protein: item.protein, fat: item.fat, date: item.date, createdAt: item.createdAt });
     }
   } else {
-    queuePush({ _module: 'diet', type: 'upsertItem', id: parseInt(item.id), mealType: item.mealType,
+    queuePush({ _module: 'diet', type: 'upsertItem', id: item.id, mealType: item.mealType,
       name: item.name, weight: item.weight, calories: item.calories,
       carbs: item.carbs, protein: item.protein, fat: item.fat, date: item.date, createdAt: item.createdAt });
   }
@@ -109,11 +109,11 @@ async function saveFoodItemToServer(item) {
 }
 
 async function deleteFoodItemFromServer(itemId) {
-  foodItems = foodItems.filter(function(r) { return r.id !== itemId; });
   if (isOnline) {
-    try { await getPB().collection('food_items').delete(String(parseInt(itemId))).eq('user_id', authUser.id); }
-    catch(e) { queuePush({ _module: 'diet', type: 'deleteItem', id: parseInt(itemId) }); }
-  } else { queuePush({ _module: 'diet', type: 'deleteItem', id: parseInt(itemId) }); }
+    try { await getPB().collection('food_items').delete(itemId); }
+    catch(e) { queuePush({ _module: 'diet', type: 'deleteItem', id: itemId }); }
+  } else { queuePush({ _module: 'diet', type: 'deleteItem', id: itemId }); }
+  foodItems = foodItems.filter(function(r) { return r.id !== itemId; });
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_food_items', foodItems);
 }
 
@@ -367,7 +367,7 @@ async function saveDietAdd() {
     if (!name) continue;
     if (isNaN(cal) || cal <= 0) continue;
     var item = {
-      id: Date.now().toString() + '_' + i,
+      id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'),
       mealType: dietAddMealType, name: name,
       weight: parseFloat(row.weight) || 0,
       calories: cal,
@@ -473,9 +473,17 @@ function loadDrinkRecords() {
   drinkRecords = [];
 }
 
-function saveDrinkRecord(record) {
+async function saveDrinkRecord(record) {
   drinkRecords.push(record);
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_drink_records', drinkRecords);
+  if (isOnline && authUser) {
+    try {
+      await pbUpsert('drink_records', {
+        id: record.id, user_id: authUser.id, amount: record.amount,
+        date: record.date, created_at: new Date(record.createdAt).toISOString()
+      }, 'id="' + pbEscape(String(record.id)) + '"');
+    } catch(e) { /* collection may not exist, cache-only OK */ }
+  }
 }
 
 function animatePour(amount) {
@@ -562,7 +570,7 @@ function handleDrink(ml) {
   var total = getTodayDrinkTotal();
   if (total >= drinkTarget) { showToast('今日饮水已达上限（2500ml），非常棒！'); return; }
 
-  var record = { id: Date.now().toString(), amount: ml, date: dietDate, createdAt: Date.now() };
+  var record = { id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'), amount: ml, date: dietDate, createdAt: Date.now() };
   saveDrinkRecord(record);
 
   animatePour(ml);
@@ -601,9 +609,20 @@ function loadBathroomRecords() {
   bathroomRecords = [];
 }
 
-function saveBathroomRecord(record) {
+async function saveBathroomRecord(record) {
   bathroomRecords.push(record);
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bathroom_records', bathroomRecords);
+  if (isOnline && authUser) {
+    try {
+      await pbUpsert('bathroom_records', {
+        id: record.id, user_id: authUser.id,
+        shape: record.shape, color: record.color, amount: record.amount,
+        feeling: record.feeling, smell: record.smell, duration: record.duration,
+        date: record.date, time: record.time,
+        created_at: new Date(record.createdAt).toISOString()
+      }, 'id="' + pbEscape(String(record.id)) + '"');
+    } catch(e) { /* collection may not exist, cache-only OK */ }
+  }
 }
 
 function getHoursSinceLast() {
@@ -801,7 +820,7 @@ function saveBathroomRecordForm() {
   var dt = new Date(dateVal + 'T' + (timeVal || '00:00') + ':00');
   if (dt > new Date()) { showToast('时间不能超过当前时间'); return; }
   var record = {
-    id: brEditingId || Date.now().toString(),
+    id: brEditingId || Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'),
     shape: brSelected.shape, color: brSelected.color, amount: brSelected.amount,
     feeling: brSelected.feeling, smell: brSelected.smell, duration: brSelected.duration,
     date: dateVal, time: timeVal, createdAt: Date.now()
@@ -813,6 +832,10 @@ function saveBathroomRecordForm() {
     bathroomRecords.push(record);
   }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bathroom_records', bathroomRecords);
+  // Sync to PocketBase in background
+  if (isOnline && authUser) {
+    saveBathroomRecord(record).catch(function(){});
+  }
   closeBathroomModal();
   playDing();
   showToast(brEditingId ? '记录已更新' : '已记录排便');
@@ -964,11 +987,11 @@ DataModule({
     for (var i = 0; i < items.length; i++) {
       var r = items[i];
       var res = pbUpsert('food_items', {
-        id: parseInt(r.id) || (Date.now() + i), user_id: uid, meal_type: r.mealType || r.meal_type || 'lunch',
+        id: r.id || (Date.now() + i), user_id: uid, meal_type: r.mealType || r.meal_type || 'lunch',
         name: r.name, weight: r.weight || 0, calories: r.calories,
         carbs: r.carbs || 0, protein: r.protein || 0, fat: r.fat || 0,
         date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      }, 'id="' + pbEscape(String(r.id || (Date.now() + i))) + '"');
       inserted++;
     }
     return { inserted: inserted, errors: errors };
