@@ -213,12 +213,13 @@ function saveBkRecord() {
   if (amount > 99999999) { showToast('金额过大，请重新输入'); return; }
   var dateVal = document.getElementById('bkDateInput').value || todayStr();
   var noteVal = document.getElementById('bkNoteInput').value.trim();
-  var record = { id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'), type: bkCalcType, amount: amount, category: bkCalcCategory, note: noteVal, date: dateVal, createdAt: Date.now() };
+  var cat = bkCalcCategory, amt = amount;
+  var record = { id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'), type: bkCalcType, amount: amt, category: cat, note: noteVal, date: dateVal, createdAt: Date.now() };
   bkRecords.unshift(record);
   saveBkRecordToServer(record);
   closeBkAmountModal();
   playDing();
-  showToast('已记录：' + bkCalcCategory + ' ' + amount + '元');
+  showToast('已记录：' + cat + ' ' + amt + '元');
   renderBkRecordsView();
 }
 
