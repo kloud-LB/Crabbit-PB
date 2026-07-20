@@ -90,18 +90,18 @@ async function saveFoodItemToServer(item) {
   if (isOnline) {
     try {
       await pbUpsert('food_items', {
-        id: parseInt(item.id), user_id: authUser.id, meal_type: item.mealType,
+        id: item.id, user_id: authUser.id, meal_type: item.mealType,
         name: item.name, weight: item.weight || 0, calories: item.calories,
         carbs: item.carbs || 0, protein: item.protein || 0, fat: item.fat || 0,
         date: item.date, created_at: new Date(item.createdAt).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(item.id))) + '"');
+      }, 'id="' + pbEscape(String(item.id)) + '"');
     } catch(e) {
-      queuePush({ _module: 'diet', type: 'upsertItem', id: parseInt(item.id), mealType: item.mealType,
+      queuePush({ _module: 'diet', type: 'upsertItem', id: item.id, mealType: item.mealType,
         name: item.name, weight: item.weight, calories: item.calories,
         carbs: item.carbs, protein: item.protein, fat: item.fat, date: item.date, createdAt: item.createdAt });
     }
   } else {
-    queuePush({ _module: 'diet', type: 'upsertItem', id: parseInt(item.id), mealType: item.mealType,
+    queuePush({ _module: 'diet', type: 'upsertItem', id: item.id, mealType: item.mealType,
       name: item.name, weight: item.weight, calories: item.calories,
       carbs: item.carbs, protein: item.protein, fat: item.fat, date: item.date, createdAt: item.createdAt });
   }
@@ -109,11 +109,11 @@ async function saveFoodItemToServer(item) {
 }
 
 async function deleteFoodItemFromServer(itemId) {
-  foodItems = foodItems.filter(function(r) { return r.id !== itemId; });
   if (isOnline) {
-    try { await getPB().collection('food_items').delete(String(parseInt(itemId))).eq('user_id', authUser.id); }
-    catch(e) { queuePush({ _module: 'diet', type: 'deleteItem', id: parseInt(itemId) }); }
-  } else { queuePush({ _module: 'diet', type: 'deleteItem', id: parseInt(itemId) }); }
+    try { await getPB().collection('food_items').delete(itemId); }
+    catch(e) { queuePush({ _module: 'diet', type: 'deleteItem', id: itemId }); }
+  } else { queuePush({ _module: 'diet', type: 'deleteItem', id: itemId }); }
+  foodItems = foodItems.filter(function(r) { return r.id !== itemId; });
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_food_items', foodItems);
 }
 
@@ -327,9 +327,19 @@ function renderDietAddRows() {
     '</div>';
   }).join('');
 
-  // Bind input events
+  // Bind input events with IME composition support
   container.querySelectorAll('.diet-add-input').forEach(function(input) {
+    var composing = false;
+    input.addEventListener('compositionstart', function() { composing = true; });
+    input.addEventListener('compositionend', function() {
+      composing = false;
+      // Final value read after composition
+      var idx = parseInt(this.dataset.idx);
+      var field = this.dataset.field;
+      if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
+    });
     input.addEventListener('input', function() {
+      if (composing) return; // skip during IME composition
       var idx = parseInt(this.dataset.idx);
       var field = this.dataset.field;
       if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
@@ -342,6 +352,56 @@ function renderDietAddRows() {
       renderDietAddRows();
     };
   });
+}
+
+// Render a single row and append to DOM (avoids destroying IME composition)
+function renderDietAddRow(i) {
+  var row = dietAddRows[i];
+  var container = document.getElementById('dietAddRows');
+  var html = '<div class="diet-add-row">' +
+    '<div class="diet-add-row-fields">' +
+      '<input class="diet-add-input diet-add-name" placeholder="食物名称" value="' + escHtml(row.name) + '" data-idx="' + i + '" data-field="name">' +
+      '<div class="diet-add-row-sub">' +
+        '<input class="diet-add-input diet-add-num" placeholder="克数" value="' + row.weight + '" data-idx="' + i + '" data-field="weight" inputmode="decimal" type="number" step="1">' +
+        '<input class="diet-add-input diet-add-num" placeholder="热量(千焦)" value="' + row.calories + '" data-idx="' + i + '" data-field="calories" inputmode="decimal" type="number" step="10">' +
+      '</div>' +
+      '<div class="diet-add-row-sub">' +
+        '<input class="diet-add-input diet-add-num" placeholder="碳水(g)" value="' + row.carbs + '" data-idx="' + i + '" data-field="carbs" inputmode="decimal" type="number" step="0.1">' +
+        '<input class="diet-add-input diet-add-num" placeholder="蛋白质(g)" value="' + row.protein + '" data-idx="' + i + '" data-field="protein" inputmode="decimal" type="number" step="0.1">' +
+        '<input class="diet-add-input diet-add-num" placeholder="脂肪(g)" value="' + row.fat + '" data-idx="' + i + '" data-field="fat" inputmode="decimal" type="number" step="0.1">' +
+      '</div>' +
+    '</div>' +
+    '<button class="diet-add-remove" data-idx="' + i + '"><i class="ri-close-line"></i></button>' +
+  '</div>';
+  container.insertAdjacentHTML('beforeend', html);
+
+  // Bind IME-safe input events for the new row
+  var newRow = container.lastElementChild;
+  newRow.querySelectorAll('.diet-add-input').forEach(function(input) {
+    var composing = false;
+    input.addEventListener('compositionstart', function() { composing = true; });
+    input.addEventListener('compositionend', function() {
+      composing = false;
+      var idx = parseInt(this.dataset.idx);
+      var field = this.dataset.field;
+      if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
+    });
+    input.addEventListener('input', function() {
+      if (composing) return;
+      var idx = parseInt(this.dataset.idx);
+      var field = this.dataset.field;
+      if (dietAddRows[idx]) dietAddRows[idx][field] = this.value;
+    });
+  });
+  // Bind remove button
+  var removeBtn = newRow.querySelector('.diet-add-remove');
+  if (removeBtn) {
+    removeBtn.onclick = function() {
+      var idx = parseInt(this.dataset.idx);
+      dietAddRows.splice(idx, 1);
+      renderDietAddRows();
+    };
+  }
 }
 
 function closeDietAdd() {
@@ -367,7 +427,7 @@ async function saveDietAdd() {
     if (!name) continue;
     if (isNaN(cal) || cal <= 0) continue;
     var item = {
-      id: Date.now().toString() + '_' + i,
+      id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'),
       mealType: dietAddMealType, name: name,
       weight: parseFloat(row.weight) || 0,
       calories: cal,
@@ -473,9 +533,17 @@ function loadDrinkRecords() {
   drinkRecords = [];
 }
 
-function saveDrinkRecord(record) {
+async function saveDrinkRecord(record) {
   drinkRecords.push(record);
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_drink_records', drinkRecords);
+  if (isOnline && authUser) {
+    try {
+      await pbUpsert('drink_records', {
+        id: record.id, user_id: authUser.id, amount: record.amount,
+        date: record.date, created_at: new Date(record.createdAt).toISOString()
+      }, 'id="' + pbEscape(String(record.id)) + '"');
+    } catch(e) { /* collection may not exist, cache-only OK */ }
+  }
 }
 
 function animatePour(amount) {
@@ -562,7 +630,7 @@ function handleDrink(ml) {
   var total = getTodayDrinkTotal();
   if (total >= drinkTarget) { showToast('今日饮水已达上限（2500ml），非常棒！'); return; }
 
-  var record = { id: Date.now().toString(), amount: ml, date: dietDate, createdAt: Date.now() };
+  var record = { id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'), amount: ml, date: dietDate, createdAt: Date.now() };
   saveDrinkRecord(record);
 
   animatePour(ml);
@@ -601,9 +669,19 @@ function loadBathroomRecords() {
   bathroomRecords = [];
 }
 
-function saveBathroomRecord(record) {
-  bathroomRecords.push(record);
-  if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bathroom_records', bathroomRecords);
+async function saveBathroomRecord(record) {
+  // Note: caller (saveBathroomRecordForm) already handles array push + cache save
+  if (isOnline && authUser) {
+    try {
+      await pbUpsert('bathroom_records', {
+        id: record.id, user_id: authUser.id,
+        shape: record.shape, color: record.color, amount: record.amount,
+        feeling: record.feeling, smell: record.smell, duration: record.duration,
+        date: record.date, time: record.time,
+        created_at: new Date(record.createdAt).toISOString()
+      }, 'id="' + pbEscape(String(record.id)) + '"');
+    } catch(e) { /* collection may not exist, cache-only OK */ }
+  }
 }
 
 function getHoursSinceLast() {
@@ -801,7 +879,7 @@ function saveBathroomRecordForm() {
   var dt = new Date(dateVal + 'T' + (timeVal || '00:00') + ':00');
   if (dt > new Date()) { showToast('时间不能超过当前时间'); return; }
   var record = {
-    id: brEditingId || Date.now().toString(),
+    id: brEditingId || Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'),
     shape: brSelected.shape, color: brSelected.color, amount: brSelected.amount,
     feeling: brSelected.feeling, smell: brSelected.smell, duration: brSelected.duration,
     date: dateVal, time: timeVal, createdAt: Date.now()
@@ -813,6 +891,10 @@ function saveBathroomRecordForm() {
     bathroomRecords.push(record);
   }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bathroom_records', bathroomRecords);
+  // Sync to PocketBase in background
+  if (isOnline && authUser) {
+    saveBathroomRecord(record).catch(function(){});
+  }
   closeBathroomModal();
   playDing();
   showToast(brEditingId ? '记录已更新' : '已记录排便');
@@ -916,8 +998,10 @@ DataModule({
         var field = input.dataset.field;
         if (dietAddRows[idx]) dietAddRows[idx][field] = input.value;
       });
+      var newIdx = dietAddRows.length;
       dietAddRows.push({ name: '', weight: '', calories: '', carbs: '', protein: '', fat: '' });
-      renderDietAddRows();
+      // Append single new row without destroying existing inputs (preserves IME)
+      renderDietAddRow(newIdx);
     };
 
     // Edit food
@@ -964,11 +1048,11 @@ DataModule({
     for (var i = 0; i < items.length; i++) {
       var r = items[i];
       var res = pbUpsert('food_items', {
-        id: parseInt(r.id) || (Date.now() + i), user_id: uid, meal_type: r.mealType || r.meal_type || 'lunch',
+        id: r.id || (Date.now() + i), user_id: uid, meal_type: r.mealType || r.meal_type || 'lunch',
         name: r.name, weight: r.weight || 0, calories: r.calories,
         carbs: r.carbs || 0, protein: r.protein || 0, fat: r.fat || 0,
         date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      }, 'id="' + pbEscape(String(r.id || (Date.now() + i))) + '"');
       inserted++;
     }
     return { inserted: inserted, errors: errors };

@@ -3,7 +3,13 @@
    SDK CDN: https://cdn.jsdelivr.net/npm/pocketbase@latest/dist/pocketbase.umd.js
    ================================================================ */
 
-const PB_URL = 'http://localhost:8090';
+// 自动切换后端地址：本地开发用 localhost，线上用 serveo 穿透
+// 如果隧道地址变了（serveo 重启），修改 TUNNEL_URL 然后重新 push 即可
+const TUNNEL_URL = 'https://4a6e4e108af9b1a9-115-192-251-55.serveousercontent.com';
+const LOCAL_URL  = 'http://localhost:8090';
+
+var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+var __PB_URL = isLocal ? LOCAL_URL : TUNNEL_URL;
 
 let __pb = null;
 
@@ -12,7 +18,7 @@ function getPB() {
     if (typeof PocketBase === 'undefined') {
       throw new Error('PocketBase SDK 未加载，请检查 index.html 中的 CDN script 标签');
     }
-    __pb = new PocketBase(PB_URL);
+    __pb = new PocketBase(__PB_URL);
     // Auto-persist auth store to localStorage
     __pb.authStore.onChange(function(token, model) {
       // authStore 自动保存到 localStorage（PocketBase SDK 默认行为）

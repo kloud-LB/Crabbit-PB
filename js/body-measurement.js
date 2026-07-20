@@ -43,23 +43,23 @@ async function saveBmRecordToServer(record) {
   if (isOnline) {
     try {
       await pbUpsert('body_measurements', {
-        id: parseInt(record.id), user_id: authUser.id, type: record.type,
+        id: record.id, user_id: authUser.id, type: record.type,
         value: record.value, date: record.date, created_at: new Date(record.createdAt).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(record.id))) + '"');
+      }, 'id="' + pbEscape(String(record.id)) + '"');
     } catch(e) {
-      queuePush({ _module: 'bodyMeasurement', type: 'upsertRecord', id: parseInt(record.id), type2: record.type, value: record.value, date: record.date, createdAt: record.createdAt });
+      queuePush({ _module: 'bodyMeasurement', type: 'upsertRecord', id: record.id, type2: record.type, value: record.value, date: record.date, createdAt: record.createdAt });
     }
   } else {
-    queuePush({ _module: 'bodyMeasurement', type: 'upsertRecord', id: parseInt(record.id), type2: record.type, value: record.value, date: record.date, createdAt: record.createdAt });
+    queuePush({ _module: 'bodyMeasurement', type: 'upsertRecord', id: record.id, type2: record.type, value: record.value, date: record.date, createdAt: record.createdAt });
   }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bm_records', bmRecords);
 }
 
 async function deleteBmRecordFromServer(recordId) {
   if (isOnline) {
-    try { await getPB().collection('body_measurements').delete(String(parseInt(recordId))).eq('user_id', authUser.id); }
-    catch(e) { queuePush({ _module: 'bodyMeasurement', type: 'deleteRecord', id: parseInt(recordId) }); }
-  } else { queuePush({ _module: 'bodyMeasurement', type: 'deleteRecord', id: parseInt(recordId) }); }
+    try { await getPB().collection('body_measurements').delete(recordId); }
+    catch(e) { queuePush({ _module: 'bodyMeasurement', type: 'deleteRecord', id: recordId }); }
+  } else { queuePush({ _module: 'bodyMeasurement', type: 'deleteRecord', id: recordId }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bm_records', bmRecords);
 }
 
@@ -228,7 +228,7 @@ async function saveBmRecord() {
   if (isNaN(value) || value <= 0) { showToast('请输入有效数值'); return; }
   if (value > 999) { showToast('数值过大'); return; }
   var dateVal = document.getElementById('bmDateInput').value || todayStr();
-  var record = { id: Date.now().toString(), type: bmSelectedType, value: value, date: dateVal, createdAt: Date.now() };
+  var record = { id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'), type: bmSelectedType, value: value, date: dateVal, createdAt: Date.now() };
   bmRecords.unshift(record);
   await saveBmRecordToServer(record);
   closeBmModal();
@@ -308,10 +308,10 @@ DataModule({
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
       var res = pbUpsert('body_measurements', {
-        id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type,
+        id: r.id || (Date.now() + i), user_id: uid, type: r.type,
         value: r.value, date: r.date || todayStr(),
         created_at: new Date(r.createdAt || Date.now()).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      }, 'id="' + pbEscape(String(r.id || (Date.now() + i))) + '"');
       inserted++;
     }
     return { inserted: inserted, errors: errors };
