@@ -47,8 +47,25 @@ function loadSleepRecords() {
   sleepRecords = [];
 }
 
-function saveSleepRecordToCache() {
+async function saveSleepRecordToServer(record) {
+  // Always save to cache first (instant)
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_sleep_records', sleepRecords);
+  // Sync to PocketBase
+  if (isOnline && authUser) {
+    try {
+      await pbUpsert('sleep_records', {
+        id: record.id, user_id: authUser.id, type: record.type,
+        sleep_time: record.sleep_time, wake_time: record.wake_time,
+        duration_min: record.duration_min, date: record.date,
+        rating: record.rating || '', quality: record.quality || '',
+        created_at: new Date(record.createdAt).toISOString()
+      }, 'id="' + pbEscape(String(record.id)) + '"');
+    } catch(e) {
+      queuePush({ _module: 'sleep', type: 'upsertRecord', id: record.id, type2: record.type,
+        sleep_time: record.sleep_time, wake_time: record.wake_time, duration_min: record.duration_min,
+        date: record.date, rating: record.rating, quality: record.quality, createdAt: record.createdAt });
+    }
+  }
 }
 
 // ---- Clock Dial ----
@@ -262,7 +279,7 @@ function saveSleepRecord() {
   if (dur <= 0) { showToast('入睡和起床时间有误'); return; }
 
   var record = {
-    id: slEditingId || Date.now().toString(),
+    id: slEditingId || Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'),
     type: type, sleep_time: st, wake_time: wt, duration_min: dur,
     date: dateVal, rating: slSelected.rating, quality: slSelected.quality,
     createdAt: Date.now()
@@ -274,7 +291,7 @@ function saveSleepRecord() {
   } else {
     sleepRecords.push(record);
   }
-  saveSleepRecordToCache();
+  saveSleepRecordToServer(record);
   closeSleepModal();
   playDing();
   showToast(slEditingId ? '已更新' : '已记录');
@@ -309,10 +326,10 @@ DataModule({
   actions: {
     upsertRecord: async function(pb, uid, a) {
       pbUpsert('sleep_records', {
-        id: parseInt(a.id), user_id: uid, type: a.type, sleep_time: a.sleep_time,
+        id: a.id, user_id: uid, type: a.type, sleep_time: a.sleep_time,
         wake_time: a.wake_time, duration_min: a.duration_min, date: a.date,
         rating: a.rating, quality: a.quality, created_at: new Date(a.createdAt).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(a.id))) + '"');
+      }, 'id="' + pbEscape(String(a.id)) + '"');
     },
     deleteRecord: async function(pb, uid, a) {
       await pb.collection('sleep_records').delete(String(a.id));
@@ -384,12 +401,12 @@ DataModule({
     for (var i = 0; i < items.length; i++) {
       var r = items[i];
       var res = pbUpsert('sleep_records', {
-        id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type || 'main',
+        id: r.id || (Date.now() + i), user_id: uid, type: r.type || 'main',
         sleep_time: r.sleep_time, wake_time: r.wake_time,
         duration_min: r.duration_min || 480, date: r.date || todayStr(),
         rating: r.rating, quality: r.quality,
         created_at: new Date(r.createdAt || Date.now()).toISOString()
-      }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      }, 'id="' + pbEscape(String(r.id || (Date.now() + i))) + '"');
       inserted++;
     }
     return { inserted: inserted, errors: errors };
