@@ -70,14 +70,13 @@ async function loadBkRecordsOnline() {
     try {
       var pb = getPB();
       var uid = authUser.id;
-      var res = await pb.collection('bookkeeping_records').eq('user_id', uid).order('date', { ascending: false }).order('created_at', { ascending: false });
-      
+      var res = await pb.collection('bookkeeping_records').getFullList({filter: 'user_id="' + pbEscape(uid) + '"', sort: '-date,-created_at'});
+
         bkRecords = res.map(function(r) {
           return { id: r.id.toString(), type: r.type, amount: parseFloat(r.amount), category: r.category, note: r.note || '', date: r.date, createdAt: new Date(r.created_at).getTime() };
         });
         if (uid) dbCacheSave(uid, 'checkin_cache_bk_records', bkRecords);
         return;
-    }
     } catch(e) {}
   }
   if (authUser) {
@@ -90,21 +89,21 @@ async function loadBkRecordsOnline() {
 async function saveBkRecordToServer(record) {
   if (isOnline) {
     try {
-      await pbUpsert('bookkeeping_records', { id: parseInt(record.id), user_id: authUser.id, type: record.type, amount: record.amount, category: record.category, note: record.note || '', date: record.date, created_at: new Date(record.createdAt).toISOString() }, 'id="' + pbEscape(String(parseInt(record.id))) + '"');
+      await pbUpsert('bookkeeping_records', { id: record.id, user_id: authUser.id, type: record.type, amount: record.amount, category: record.category, note: record.note || '', date: record.date, created_at: new Date(record.createdAt).toISOString() }, 'id="' + pbEscape(String(record.id)) + '"');
     } catch(e) {
-      queuePush({ _module: 'bookkeeping', type: 'upsertRecord', id: parseInt(record.id), type2: record.type, amount: record.amount, category: record.category, note: record.note, date: record.date, createdAt: record.createdAt });
+      queuePush({ _module: 'bookkeeping', type: 'upsertRecord', id: record.id, type2: record.type, amount: record.amount, category: record.category, note: record.note, date: record.date, createdAt: record.createdAt });
     }
   } else {
-    queuePush({ _module: 'bookkeeping', type: 'upsertRecord', id: parseInt(record.id), type2: record.type, amount: record.amount, category: record.category, note: record.note, date: record.date, createdAt: record.createdAt });
+    queuePush({ _module: 'bookkeeping', type: 'upsertRecord', id: record.id, type2: record.type, amount: record.amount, category: record.category, note: record.note, date: record.date, createdAt: record.createdAt });
   }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bk_records', bkRecords);
 }
 
 async function deleteBkRecordFromServer(recordId) {
   if (isOnline) {
-    try { await getPB().collection('bookkeeping_records').delete(String(parseInt(recordId))).eq('user_id', authUser.id); }
-    catch(e) { queuePush({ _module: 'bookkeeping', type: 'deleteRecord', id: parseInt(recordId) }); }
-  } else { queuePush({ _module: 'bookkeeping', type: 'deleteRecord', id: parseInt(recordId) }); }
+    try { await getPB().collection('bookkeeping_records').delete(recordId); }
+    catch(e) { queuePush({ _module: 'bookkeeping', type: 'deleteRecord', id: recordId }); }
+  } else { queuePush({ _module: 'bookkeeping', type: 'deleteRecord', id: recordId }); }
   if (authUser) dbCacheSave(authUser.id, 'checkin_cache_bk_records', bkRecords);
 }
 
@@ -214,7 +213,7 @@ function saveBkRecord() {
   if (amount > 99999999) { showToast('金额过大，请重新输入'); return; }
   var dateVal = document.getElementById('bkDateInput').value || todayStr();
   var noteVal = document.getElementById('bkNoteInput').value.trim();
-  var record = { id: Date.now().toString(), type: bkCalcType, amount: amount, category: bkCalcCategory, note: noteVal, date: dateVal, createdAt: Date.now() };
+  var record = { id: Date.now().toString() + Math.floor(Math.random()*100).toString().padStart(2,'0'), type: bkCalcType, amount: amount, category: bkCalcCategory, note: noteVal, date: dateVal, createdAt: Date.now() };
   bkRecords.unshift(record);
   saveBkRecordToServer(record);
   closeBkAmountModal();
@@ -498,6 +497,7 @@ function getPeriodDateRange(periodType, periodValue) {
     var y3 = parseInt(periodValue), months = [];
     for (var k = 1; k <= 12; k++) months.push(y3 + '-' + String(k).padStart(2,'0'));
     return months;
+  }
 }
 
 function getPeriodLabels(periodType, dates) {
@@ -693,7 +693,7 @@ DataModule({
     var records = data.bookkeeping, inserted = 0, errors = 0;
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
-      var res = pbUpsert('bookkeeping_records', { id: parseInt(r.id) || (Date.now() + i), user_id: uid, type: r.type, amount: r.amount, category: r.category, note: r.note || '', date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString() }, 'id="' + pbEscape(String(parseInt(r.id) || (Date.now() + i))) + '"');
+      var res = pbUpsert('bookkeeping_records', { id: r.id || (Date.now() + i), user_id: uid, type: r.type, amount: r.amount, category: r.category, note: r.note || '', date: r.date || todayStr(), created_at: new Date(r.createdAt || Date.now()).toISOString() }, 'id="' + pbEscape(String(r.id || (Date.now() + i))) + '"');
       inserted++;
     }
     return { inserted: inserted, errors: errors };
