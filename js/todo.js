@@ -616,6 +616,13 @@ DataModule({
   bindEvents: function() {
     document.getElementById('todoModalOverlay').onclick = function(e) { if (e.target === document.getElementById('todoModalOverlay')) closeTodoForm(); };
     document.getElementById('todoFormSubmit').onclick = saveTodoItemForm;
+    // Priority toggle click handler
+    document.getElementById('priorityToggle').onclick = function(e) {
+      var btn = e.target.closest('.priority-opt');
+      if (!btn) return;
+      document.querySelectorAll('#priorityToggle .priority-opt').forEach(function(b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
+    };
     document.getElementById('catModalOverlay').onclick = function(e) { if (e.target === document.getElementById('catModalOverlay')) closeCatManager(); };
     document.getElementById('catAddBtn').onclick = function() { openCatEdit(); };
     document.getElementById('catEditOverlay').onclick = function(e) { if (e.target === document.getElementById('catEditOverlay')) closeCatEdit(); };
