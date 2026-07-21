@@ -23,7 +23,7 @@ async def pb_admin_auth() -> str:
 
     pb = _get_pb()
     try:
-        auth_data = await pb.admins.auth_with_password(
+        auth_data = pb.admins.auth_with_password(
             settings.pb_admin_email,
             settings.pb_admin_password,
         )
@@ -38,7 +38,7 @@ async def pb_get_list(collection: str, filter_str: str = "", sort: str = "") -> 
     await pb_admin_auth()
     pb = _get_pb()
     try:
-        result = await pb.collection(collection).get_full_list({
+        result = pb.collection(collection).get_full_list(query_params={
             "filter": filter_str,
             "sort": sort,
         })
@@ -52,7 +52,7 @@ async def pb_get_one(collection: str, filter_str: str) -> dict | None:
     await pb_admin_auth()
     pb = _get_pb()
     try:
-        return await pb.collection(collection).get_first_list_item(filter_str)
+        return pb.collection(collection).get_first_list_item(filter_str)
     except Exception:
         return None
 
@@ -62,7 +62,7 @@ async def pb_create(collection: str, data: dict) -> dict:
     await pb_admin_auth()
     pb = _get_pb()
     try:
-        return await pb.collection(collection).create(data)
+        return pb.collection(collection).create(data)
     except Exception as e:
         raise RuntimeError(f"pb_create({collection}) failed: {e}")
 
@@ -72,7 +72,7 @@ async def pb_update(collection: str, record_id: str, data: dict) -> dict:
     await pb_admin_auth()
     pb = _get_pb()
     try:
-        return await pb.collection(collection).update(record_id, data)
+        return pb.collection(collection).update(record_id, data)
     except Exception as e:
         raise RuntimeError(f"pb_update({collection}.{record_id}) failed: {e}")
 
@@ -82,7 +82,7 @@ async def pb_delete(collection: str, record_id: str) -> None:
     await pb_admin_auth()
     pb = _get_pb()
     try:
-        await pb.collection(collection).delete(record_id)
+        pb.collection(collection).delete(record_id)
     except Exception as e:
         raise RuntimeError(f"pb_delete({collection}.{record_id}) failed: {e}")
 
