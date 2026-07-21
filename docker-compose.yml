@@ -1,15 +1,13 @@
 # Crabbit! V3 — Docker Compose 编排
 # Mac Mini 一键部署：docker compose up -d
 
-version: '3.8'
-
 services:
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest
     container_name: crabbit-pb
     volumes:
-      - ./pb/pb_data:/pb/pb_data
-      - ./pb/pb_migrations:/pb/pb_migrations
+      - ./pb/pb_data:/pb_data
+      - ./pb/pb_migrations:/pb_migrations
     ports:
       - "8090:8090"
     restart: unless-stopped

@@ -129,7 +129,7 @@ migrate((app) => {
         "autogeneratePattern": "",
         "help": "",
         "hidden": false,
-        "id": "text2222222207",
+        "id": "autodate2222222207",
         "max": 0,
         "min": 0,
         "name": "created_at",
@@ -138,7 +138,9 @@ migrate((app) => {
         "primaryKey": false,
         "required": false,
         "system": false,
-        "type": "autodate"
+        "type": "autodate",
+        "onCreate": true,
+        "onUpdate": false
       }
     ],
     "id": "pbc_3000000002",
