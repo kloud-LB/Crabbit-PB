@@ -1,0 +1,55 @@
+# SearXNG 配置文件 — 自部署搜索引擎
+# 参考: https://docs.searxng.org/admin/settings/
+
+use_default_settings: true
+
+general:
+  instance_name: "Crabbit Search"
+  debug: false
+  privacypolicy_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: "google"
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "crabbit-v3-searxng-change-me"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false
+  public_instance: false
+  image_proxy: false
+
+ui:
+  static_use_hash: true
+
+engines:
+  # 以下引擎无需 API key，开箱即用
+  - name: duckduckgo
+    disabled: false
+
+  - name: wikipedia
+    disabled: false
+
+  - name: google
+    disabled: false
+
+  - name: bing
+    disabled: false
+
+  - name: brave
+    disabled: false
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 10.0
+  useragent_suffix: ""
+  # 如果 Mac Mini 在国内需要代理才能访问 Google 等，在这里配置
+  # proxies:
+  #   http: http://127.0.0.1:7890
+  #   https: http://127.0.0.1:7890

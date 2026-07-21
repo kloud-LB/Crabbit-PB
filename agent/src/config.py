@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     deepseek_max_tokens: int = 1024
     deepseek_temperature: float = 0.7
 
-    # Brave Search
-    brave_api_key: str = ""
+    # SearXNG（自部署搜索引擎）
+    searxng_url: str = "http://localhost:8088"
 
     # Redis
     redis_url: str = "redis://localhost:6379"

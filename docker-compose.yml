@@ -19,6 +19,17 @@ services:
     container_name: crabbit-redis
     restart: unless-stopped
 
+  searxng:
+    image: searxng/searxng:latest
+    container_name: crabbit-searxng
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8088/
+    ports:
+      - "8088:8080"
+    restart: unless-stopped
+
   agent:
     build: ./agent
     container_name: crabbit-agent
@@ -28,7 +39,7 @@ services:
       - PB_ADMIN_PASSWORD=${PB_ADMIN_PASSWORD:-changeme123}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - SEARXNG_URL=http://searxng:8080
       - REDIS_URL=redis://redis:6379
       - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-INFO}
     ports:
@@ -36,6 +47,7 @@ services:
     depends_on:
       - pocketbase
       - redis
+      - searxng
     restart: unless-stopped
 
   napcat:
