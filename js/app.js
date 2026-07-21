@@ -158,7 +158,8 @@ const VIEW_TITLES = {
   'viewBookkeepingDetail': '记账详情',
   'viewBodyMeasurement': '身材管理',
   'viewDiet': '吃喝拉撒',
-  'viewSleep': '睡眠记录'
+  'viewSleep': '睡眠记录',
+  'viewAgentChat': '🦀 蟹老板'
 };
 
 function navigateTo(viewName) {
@@ -237,6 +238,7 @@ function bindEvents() {
       else if (nav === 'body') navigateTo('viewBodyMeasurement');
       else if (nav === 'diet') navigateTo('viewDiet');
       else if (nav === 'sleep') navigateTo('viewSleep');
+      else if (nav === 'agent') navigateTo('viewAgentChat');
     };
     // Ripple effect
     card.addEventListener('pointerdown', function(e) {
@@ -329,6 +331,35 @@ async function init() {
   if (!loggedIn) return;
 
   onUserReady();
+
+  // V3: 页面可见时自动刷新数据（Agent 可能在后台写入了新数据）
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && authUser) {
+      try {
+        var pb = getPB();
+        dbRefreshAllCaches(pb, authUser.id).then(function() {
+          // 重新装载
+          for (var modId in __modules) {
+            var mod = __modules[modId];
+            if (!mod.tables) continue;
+            mod.tables.forEach(function(t) {
+              var fresh = dbCacheLoad(authUser.id, t.cacheKey);
+              if (fresh !== null && fresh !== undefined) {
+                mod.state[t.stateProp] = fresh;
+              }
+            });
+          }
+          dbEmit('data-refreshed', {});
+          if (typeof renderStats === 'function') renderStats();
+        });
+      } catch(e) {}
+    }
+  });
+
+  // V3: 连接 Agent WebSocket（PWA 内嵌对话窗口）
+  if (typeof agentConnect === 'function') {
+    setTimeout(function() { agentConnect(); }, 2000);
+  }
 
   // Bind migration import
   bindMigrateImport();

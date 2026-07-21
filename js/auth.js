@@ -444,6 +444,11 @@ function bindUserPanelEvents() {
     setTimeout(function() { openNicknameEdit(); }, 300);
   };
 
+  document.getElementById('userPanelBindQQ').onclick = function() {
+    closeUserPanel();
+    openQQBinding();
+  };
+
   document.getElementById('userPanelLogout').onclick = function() {
     closeUserPanel();
     signOutUser();
@@ -470,6 +475,90 @@ function bindUserPanelEvents() {
     if (e.target === document.getElementById('nicknameEditOverlay')) closeNicknameEdit();
   };
   document.getElementById('nicknameEditSubmit').onclick = saveNicknameEdit;
+
+  // QQ binding modal (V3)
+  var qqOverlay = document.getElementById('qqBindOverlay');
+  if (qqOverlay) {
+    qqOverlay.onclick = function(e) {
+      if (e.target === qqOverlay) closeQQBinding();
+    };
+  }
+  var qqSubmit = document.getElementById('qqBindSubmit');
+  if (qqSubmit) {
+    qqSubmit.onclick = submitQQBinding;
+  }
+}
+
+// ---- QQ 绑定（V3 新增） ----
+function openQQBinding() {
+  var modal = document.getElementById('qqBindOverlay');
+  if (!modal) return;
+
+  // 检查是否已绑定
+  if (authUser) {
+    try {
+      var pb = getPB();
+      pb.collection('user_qq_bindings').getFirstListItem('user_id="' + pbEscape(authUser.id) + '"')
+        .then(function(r) {
+          document.getElementById('qqBindStatus').textContent = '已绑定 QQ: ' + r.qq_id;
+          document.getElementById('qqBindInput').value = r.qq_id;
+          document.getElementById('qqBindInput').disabled = true;
+          document.getElementById('qqBindSubmit').textContent = '解绑';
+          document.getElementById('qqBindSubmit').dataset.action = 'unbind';
+        })
+        .catch(function() {
+          document.getElementById('qqBindStatus').textContent = '未绑定';
+          document.getElementById('qqBindInput').value = '';
+          document.getElementById('qqBindInput').disabled = false;
+          document.getElementById('qqBindSubmit').textContent = '绑定';
+          document.getElementById('qqBindSubmit').dataset.action = 'bind';
+        });
+    } catch(e) {}
+  }
+
+  modal.classList.add('show');
+}
+
+function closeQQBinding() {
+  var modal = document.getElementById('qqBindOverlay');
+  if (modal) modal.classList.remove('show');
+}
+
+async function submitQQBinding() {
+  var qqId = document.getElementById('qqBindInput').value.trim();
+  var btn = document.getElementById('qqBindSubmit');
+  var action = btn.dataset.action || 'bind';
+
+  if (!qqId && action === 'bind') {
+    showToast('请输入 QQ 号');
+    return;
+  }
+
+  try {
+    var pb = getPB();
+
+    if (action === 'unbind') {
+      var existing = await pb.collection('user_qq_bindings').getFirstListItem('user_id="' + pbEscape(authUser.id) + '"');
+      await pb.collection('user_qq_bindings').delete(existing.id);
+      showToast('已解绑 QQ');
+      closeQQBinding();
+      return;
+    }
+
+    // 绑定
+    var bindCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    await pbUpsert('user_qq_bindings', {
+      user_id: authUser.id,
+      qq_id: qqId,
+      bind_code: bindCode,
+      bind_at: new Date().toISOString()
+    }, 'user_id="' + pbEscape(authUser.id) + '"');
+
+    showToast('QQ 绑定成功！绑定码: ' + bindCode);
+    closeQQBinding();
+  } catch(e) {
+    showToast('操作失败，请重试');
+  }
 }
 
 async function signOutUser() {

@@ -1,0 +1,50 @@
+# Crabbit! V3 — Docker Compose 编排
+# Mac Mini 一键部署：docker compose up -d
+
+version: '3.8'
+
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: crabbit-pb
+    volumes:
+      - ./pb/pb_data:/pb/pb_data
+      - ./pb/pb_migrations:/pb/pb_migrations
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: crabbit-redis
+    restart: unless-stopped
+
+  agent:
+    build: ./agent
+    container_name: crabbit-agent
+    environment:
+      - PB_URL=http://pocketbase:8090
+      - PB_ADMIN_EMAIL=${PB_ADMIN_EMAIL:-admin@crabbit.local}
+      - PB_ADMIN_PASSWORD=${PB_ADMIN_PASSWORD:-changeme123}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-INFO}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pocketbase
+      - redis
+    restart: unless-stopped
+
+  napcat:
+    image: napcat/napcatqq:latest
+    container_name: crabbit-napcat
+    environment:
+      - NAPCAT_WS_URL=ws://agent:8080/ws/qq
+    volumes:
+      - ./napcat_data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - agent

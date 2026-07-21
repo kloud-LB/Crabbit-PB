@@ -1,0 +1,33 @@
+# Crabbit! V3 Agent — Python Dependencies
+
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+websockets==14.1
+
+# LLM
+openai==1.59.0           # DeepSeek API 兼容 OpenAI SDK
+langchain==0.3.15
+langchain-openai==0.3.0
+
+# Database
+pocketbase==0.14.0
+
+# Async & Queue
+redis==5.2.1
+httpx==0.28.1
+
+# Scheduling
+apscheduler==3.11.0
+
+# Web Search & Scraping
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# Config
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+
+# Utilities
+tenacity==9.0.0          # Retry logic

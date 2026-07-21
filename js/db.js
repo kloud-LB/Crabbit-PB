@@ -148,6 +148,23 @@ function dbRenderView(viewName) {
   }
 }
 
+// ================================================================
+// 事件系统（V3 新增）— 轻量发布/订阅，各模块解耦
+// ================================================================
+
+var __listeners = {};
+
+function dbOn(event, callback) {
+  if (!__listeners[event]) __listeners[event] = [];
+  __listeners[event].push(callback);
+}
+
+function dbEmit(event, payload) {
+  (__listeners[event] || []).forEach(function(fn) {
+    try { fn(payload); } catch(e) {}
+  });
+}
+
 function dbMigrateAll(data, pb, uid) {
   var results = {};
   var seen = {};

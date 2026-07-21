@@ -71,6 +71,11 @@
         <span class="home-card-title">睡眠记录</span>
         <span class="home-card-desc">主睡眠 · 小憩</span>
       </button>
+      <button class="home-card" data-nav="agent" style="--card-accent:#f59e0b">
+        <span class="home-card-icon">🦀</span>
+        <span class="home-card-title">蟹老板</span>
+        <span class="home-card-desc">AI 助手 · QQ 联动</span>
+      </button>
     </div>
   </div>
 
@@ -205,6 +210,43 @@
   <div class="sl-card" id="slTodayCard"></div>
   <div class="sl-card sl-card-nap" id="slNapCard"></div>
   <div class="sl-card" id="slStatsCard"></div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Agent Chat View (V3 新增) -->
+<!-- ================================================================ -->
+<div class="view" id="viewAgentChat">
+  <div class="agent-tabs" id="agentChatTabs">
+    <button class="agent-tab-btn active" data-tab="chat">💬 对话</button>
+    <button class="agent-tab-btn" data-tab="persona">🎭 人设</button>
+    <button class="agent-tab-btn" data-tab="review">📋 审查</button>
+  </div>
+
+  <!-- 对话面板 -->
+  <div class="agent-panel" id="agentChatPanel">
+    <div class="agent-chat-messages" id="agentChatMessages"></div>
+    <div class="agent-chat-input-row">
+      <input class="agent-chat-input" id="agentChatInput" placeholder="输入消息...（如：午饭花了35）" maxlength="500">
+      <button class="agent-chat-send" id="agentChatSendBtn"><i class="ri-send-plane-fill"></i></button>
+    </div>
+    <div class="agent-status disconnected" id="agentStatus">🔴 离线</div>
+  </div>
+
+  <!-- 人设面板 -->
+  <div class="agent-panel" id="agentPersonaPanel" style="display:none">
+    <div class="agent-persona-select-wrap">
+      <label class="form-label">当前人设</label>
+      <select class="form-input" id="agentPersonaSelect"></select>
+    </div>
+    <div class="agent-persona-cards" id="agentPersonaCards"></div>
+  </div>
+
+  <!-- 日志审查面板 -->
+  <div class="agent-panel" id="agentReviewPanel" style="display:none">
+    <div class="agent-review-logs" id="agentReviewLogs">
+      <div class="agent-review-empty">点击加载审查记录</div>
+    </div>
+  </div>
 </div>
 
 <!-- Sleep Record Modal -->
@@ -710,9 +752,30 @@
       <button class="user-panel-action" id="userPanelExport"><i class="ri-file-download-fill"></i> 导出</button>
       <button class="user-panel-action" id="userPanelImport"><i class="ri-file-upload-fill"></i> 导入</button>
     </div>
+    <div class="user-panel-row">
+      <button class="user-panel-action" id="userPanelBindQQ"><i class="ri-link"></i> 绑定 QQ</button>
+    </div>
     <div class="user-panel-footer">
       <button class="user-panel-logout" id="userPanelLogout"><i class="ri-logout-box-r-fill"></i> 退出登录</button>
     </div>
+  </div>
+</div>
+
+<!-- QQ Binding Modal (V3 新增) -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="qqBindOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">绑定 QQ</div>
+    <div class="form-group">
+      <label class="form-label">绑定状态</label>
+      <div class="qq-bind-status" id="qqBindStatus">检查中...</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">QQ 号</label>
+      <input class="form-input" id="qqBindInput" placeholder="输入你的 QQ 号" maxlength="15">
+    </div>
+    <button class="form-submit" id="qqBindSubmit" data-action="bind">绑定</button>
   </div>
 </div>
 
@@ -755,6 +818,7 @@
 <script src="https://cdn.jsdelivr.net/npm/pocketbase@0.23.0/dist/pocketbase.umd.js"></script>
 
 <!-- Application Modules (order matters) -->
+<script src="js/config.js"></script>
 <script src="js/pocketbase-client.js"></script>
 <script src="js/db.js"></script>
 <script src="js/offline.js"></script>
@@ -768,6 +832,7 @@
 <script src="js/body-measurement.js"></script>
 <script src="js/diet.js"></script>
 <script src="js/sleep.js"></script>
+<script src="js/agent-chat.js"></script>
 
 </body>
 </html>

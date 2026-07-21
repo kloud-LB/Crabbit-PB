@@ -3,13 +3,10 @@
    SDK CDN: https://cdn.jsdelivr.net/npm/pocketbase@latest/dist/pocketbase.umd.js
    ================================================================ */
 
-// 自动切换后端地址：本地开发用 localhost，线上用 serveo 穿透
-// 如果隧道地址变了（serveo 重启），修改 TUNNEL_URL 然后重新 push 即可
-const TUNNEL_URL = 'https://4a6e4e108af9b1a9-115-192-251-55.serveousercontent.com';
-const LOCAL_URL  = 'http://localhost:8090';
-
-var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-var __PB_URL = isLocal ? LOCAL_URL : TUNNEL_URL;
+// 从 config.js 读取 PocketBase URL，fallback 到默认值
+var __PB_URL = (typeof CONFIG !== 'undefined' && CONFIG.pocketbase && CONFIG.pocketbase.url)
+  ? CONFIG.pocketbase.url
+  : 'http://localhost:8090';
 
 let __pb = null;
 
